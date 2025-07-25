@@ -44,28 +44,28 @@ The `launcher.py` script requires specific parameters to execute your custom tra
 
 ### Parameter Reference
 
-| Argument                | Type   | Required | Default          | Description                                                         |
-| ----------------------- | ------ | -------- | ---------------- | ------------------------------------------------------------------- |
-| `--entrypoint`          | string | No\*     | None             | Path to your script (e.g., `training/train.py`)                     |
-| `--head-instance-group` | string | Yes\*\*  | None             | Instance group name for Ray head node (heterogeneous clusters only) |
-| `--head-num-cpus`       | int    | No       | Instance default | Number of CPUs reserved for head node                               |
-| `--head-num-gpus`       | int    | No       | Instance default | Number of GPUs reserved for head node                               |
-| `--include-dashboard`   | bool   | No       | True             | Enable Ray dashboard                                                |
-| `--launch-prometheus`   | bool   | No       | True             | Launch Prometheus on the head node. Internet connectivity required  |
-| `--wait-shutdown`       | int    | No       | None             | Seconds to wait before Ray shutdown                                 |
+| Argument                | Type   | Required | Default          | Description                                                              |
+| ----------------------- | ------ | -------- | ---------------- | ------------------------------------------------------------------------ |
+| `--entrypoint`          | string | No\*     | None             | Path to your script (e.g., `training/train.py`)                          |
+| `--head-instance-group` | string | Yes\*\*  | None             | Instance group name for Ray head node (heterogeneous clusters only)      |
+| `--head-num-cpus`       | int    | No       | Instance default | Number of CPUs reserved for head node                                    |
+| `--head-num-gpus`       | int    | No       | Instance default | Number of GPUs reserved for head node                                    |
+| `--include-dashboard`   | bool   | No       | True             | Enable Ray dashboard                                                     |
+| `--launch-prometheus`   | bool   | No       | False            | Launch local Prometheus on the head node. Internet connectivity required |
+| `--wait-shutdown`       | int    | No       | None             | Seconds to wait before Ray shutdown                                      |
 
 \*Required if `entry_script` environment variable is not set  
 \*\*Required only for heterogeneous clusters
 
 ### Environment Variables Reference
 
-| Variable              | Type   | Required | Description                                                                           |
-| --------------------- | ------ | -------- | ------------------------------------------------------------------------------------- |
-| `head_instance_group` | string | No       | Alternative way to set head instance group name (heterogeneous clusters only)         |
-| `head_num_cpus`       | int    | No       | Alternative way to set number of CPUs reserved for head node                          |
-| `head_num_gpus`       | int    | No       | Alternative way to set number of GPUs reserved for head node                          |
-| `launch_prometheus`   | bool   | No       | Alternative way to launch Prometheus on the head node. Internet connectivity required |
-| `wait_shutdown`       | int    | No       | Alternative way to set shutdown wait time                                             |
+| Variable              | Type   | Required | Description                                                                                 |
+| --------------------- | ------ | -------- | ------------------------------------------------------------------------------------------- |
+| `head_instance_group` | string | No       | Alternative way to set head instance group name (heterogeneous clusters only)               |
+| `head_num_cpus`       | int    | No       | Alternative way to set number of CPUs reserved for head node                                |
+| `head_num_gpus`       | int    | No       | Alternative way to set number of GPUs reserved for head node                                |
+| `launch_prometheus`   | bool   | No       | Alternative way to launch local Prometheus on the head node. Internet connectivity required |
+| `wait_shutdown`       | int    | No       | Alternative way to set shutdown wait time                                                   |
 
 \*Required if `--entrypoint` argument is not provided
 
