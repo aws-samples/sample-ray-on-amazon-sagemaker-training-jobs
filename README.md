@@ -2,6 +2,21 @@
 
 This repository demonstrates how to use Ray for distributed data processing and model training within Amazon SageMaker training jobs.
 
+## Table of Contents
+
+- [Prerequisites](#prerequisites)
+- [Project Structure](#project-structure)
+- [Key Components](#key-components)
+  - [Launcher](#launcher)
+  - [Required Parameters and Environment Variables](#required-parameters-and-environment-variables)
+    - [Parameter Reference](#parameter-reference)
+    - [Environment Variables Reference](#environment-variables-reference)
+  - [Script definition](#script-definition)
+- [Example Usage](#example-usage)
+- [Ray Dashboard](#ray-dashboard)
+- [Ray Dashboard with Prometheus and Grafana integration](#ray-dashboard-with-prometheus-and-grafana-integration)
+- [Ray Dashboard with local Prometheus and Grafana integration](#ray-dashboard-with-local-prometheus-and-grafana-integration)
+
 ## Prerequisites
 
 - AWS account with Amazon SageMaker AI access
@@ -314,7 +329,7 @@ if __name__ == "__main__":
     <MY CODE HERE>
 ```
 
-## 5. Ray Dashboard
+## Ray Dashboard
 
 For accessing the Ray Dashboard during the execution of Ray workload, we can leverage the native feature to access [SageMaker training jobs by using AWS System Manager (SSM)](https://docs.aws.amazon.com/sagemaker/latest/dg/train-remote-debugging.html)
 
@@ -437,7 +452,7 @@ Access the Ray Dashboard from your browser: `localhost:8265`:
 
 ![Ray Dashboard](./images/ray_dashboard.png)
 
-## 6. Ray Dashboard with Prometheus and Grafana integration
+## Ray Dashboard with Prometheus and Grafana integration
 
 For accessing the Ray Dashboard with Prometheus running on the SageMaker cluster and Grafana integration, during the execution of Ray workload, we can leverage the native feature to access [SageMaker training jobs by using AWS System Manager (SSM)](https://docs.aws.amazon.com/sagemaker/latest/dg/train-remote-debugging.html)
 
@@ -595,7 +610,7 @@ Access the Ray Dashboard from your browser: `localhost:8265`:
 
 ![Ray Dashboard](./images/ray_dashboard_grafana.png)
 
-## 7. Ray Dashboard with local Prometheus and Grafana integration
+## Ray Dashboard with local Prometheus and Grafana integration
 
 For accessing the Ray Dashboard with local Prometheus running on the SageMaker cluster and Grafana integration, during the execution of Ray workload, we can leverage the native feature to access [SageMaker training jobs by using AWS System Manager (SSM)](https://docs.aws.amazon.com/sagemaker/latest/dg/train-remote-debugging.html)
 
