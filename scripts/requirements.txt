@@ -1,0 +1,3 @@
+boto3
+ray[data,train,tune,serve]==2.47.1
+sagemaker==2.247.1
