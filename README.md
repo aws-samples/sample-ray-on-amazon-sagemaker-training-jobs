@@ -86,7 +86,23 @@ The `launcher.py` script requires specific parameters to execute your custom tra
 
 ### Script definition
 
-The Python file to execute must contain `if __name__ == "__main__":` block
+The Python file to execute must contain the block
+
+```python
+if __name__ == "__main__":
+    code
+```
+
+Example:
+
+```python
+import ray
+
+<YOUR_RAY_CODE>
+
+if __name__ == "__main__":
+    pass
+```
 
 ## Example Usage
 
