@@ -242,7 +242,7 @@ def get_model_config(
         trainer_configs = {
             "fsdp": training_args.fsdp,
             "fsdp_config": training_args.fsdp_config,
-            "gradient_checkpointing_kwargs": {"use_reentrant": False},
+            "gradient_checkpointing": False,
         }
     else:
         logger.info("Using DDP in case of distribution")
@@ -272,6 +272,11 @@ def load_model_and_tokenizer(
 
     # Load tokenizer
     tokenizer = AutoTokenizer.from_pretrained(script_args.model_id)
+
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
+    tokenizer.padding_side = "left"
 
     # Configure quantization
     bnb_config = BitsAndBytesConfig(

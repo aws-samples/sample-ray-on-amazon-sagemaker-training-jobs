@@ -7,6 +7,8 @@ single-node and multi-node distributed workload scenarios using Ray.
 """
 from __future__ import absolute_import
 import argparse
+import boto3
+from botocore.exceptions import ClientError, NoCredentialsError
 import importlib
 import logging
 import os
@@ -56,25 +58,6 @@ logger = get_logger()
 SUCCESS_EXIT_CODE = 0
 DEFAULT_FAILURE_CODE = 1
 
-# SageMaker instance types that support Elastic Fabric Adapter (EFA) with NCCL
-SM_EFA_NCCL_INSTANCES = [
-    "ml.g4dn.8xlarge",
-    "ml.g4dn.12xlarge",
-    "ml.g5.48xlarge",
-    "ml.p3dn.24xlarge",
-    "ml.p4d.24xlarge",
-    "ml.p4de.24xlarge",
-    "ml.p5.48xlarge",
-    "ml.trn1.32xlarge",
-]
-
-# SageMaker instance types that support RDMA over EFA
-SM_EFA_RDMA_INSTANCES = [
-    "ml.p4d.24xlarge",
-    "ml.p4de.24xlarge",
-    "ml.trn1.32xlarge",
-]
-
 # Ray configuration constants
 DEFAULT_RAY_PORT = 6379
 RAY_WORKER_POLL_INTERVAL = 10  # seconds
@@ -123,6 +106,113 @@ def signal_handler(signum: int, frame: Any) -> None:
 # Register signal handlers
 signal.signal(signal.SIGTERM, signal_handler)
 signal.signal(signal.SIGINT, signal_handler)
+
+
+def get_efa_supported_gpu_instances(region_name=None):
+    """
+    Dynamically fetch EFA-supported GPU instance types from AWS EC2.
+
+    Args:
+        region_name: AWS region name. If None, uses default region from environment/config
+
+    Returns:
+        List of SageMaker ML instance names (e.g., ['ml.p4d.24xlarge', 'ml.g5.12xlarge'])
+    """
+    try:
+        # Use region from environment if not specified
+        if region_name is None:
+            region_name = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
+
+        ec2_client = boto3.client("ec2", region_name=region_name)
+
+        # Use paginator to ensure we get all results
+        paginator = ec2_client.get_paginator("describe_instance_types")
+
+        page_iterator = paginator.paginate(
+            Filters=[{"Name": "network-info.efa-supported", "Values": ["true"]}]
+        )
+
+        instance_names = []
+
+        for page in page_iterator:
+            for instance_type in page["InstanceTypes"]:
+                # Only include instances that have GPU info
+                if "GpuInfo" in instance_type:
+                    ml_instance_name = f"ml.{instance_type['InstanceType']}"
+                    instance_names.append(ml_instance_name)
+
+        logger.info(
+            f"Found {len(instance_names)} EFA-supported GPU instance types in {region_name}"
+        )
+        logger.debug(f"EFA-supported GPU instances: {sorted(instance_names)}")
+
+        if len(instance_names) > 0:
+            return sorted(instance_names)
+        else:
+            return SM_EFA_NCCL_INSTANCES_FALLBACK
+
+    except NoCredentialsError:
+        logger.warning(
+            "AWS credentials not found. Using fallback static EFA instance list."
+        )
+        return SM_EFA_NCCL_INSTANCES_FALLBACK
+    except ClientError as e:
+        logger.warning(
+            f"AWS API error when fetching EFA instances: {e}. Using fallback static list."
+        )
+        return SM_EFA_NCCL_INSTANCES_FALLBACK
+    except Exception as e:
+        logger.warning(
+            f"Unexpected error when fetching EFA instances: {e}. Using fallback static list."
+        )
+        return SM_EFA_NCCL_INSTANCES_FALLBACK
+
+
+# Fallback static lists (your current lists as backup)
+SM_EFA_NCCL_INSTANCES_FALLBACK = [
+    "ml.g6e.48xlarge",
+    "ml.g6.24xlarge",
+    "ml.g6e.8xlarge",
+    "ml.g6e.16xlarge",
+    "ml.g6.48xlarge",
+    "ml.g5.24xlarge",
+    "ml.g6.8xlarge",
+    "ml.g4dn.12xlarge",
+    "ml.p4de.24xlarge",
+    "ml.g6e.12xlarge",
+    "ml.g5.12xlarge",
+    "ml.p6-b200.48xlarge",
+    "ml.p4d.24xlarge",
+    "ml.p5.48xlarge",
+    "ml.p5.4xlarge",
+    "ml.g5.16xlarge",
+    "ml.p5en.48xlarge",
+    "ml.g6.16xlarge",
+    "ml.g6.12xlarge",
+    "ml.dl1.24xlarge",
+    "ml.g4dn.16xlarge",
+    "ml.gr6.8xlarge",
+    "ml.g6e.24xlarge",
+    "ml.g5.8xlarge",
+    "ml.g5.48xlarge",
+    "ml.p3dn.24xlarge",
+    "ml.g4dn.8xlarge",
+]
+
+SM_EFA_RDMA_INSTANCES = [
+    "ml.p4d.24xlarge",
+    "ml.p4de.24xlarge",
+    "ml.trn1.32xlarge",
+]
+
+# Initialize dynamic lists at module level (cached)
+try:
+    SM_EFA_NCCL_INSTANCES = get_efa_supported_gpu_instances()
+except Exception as e:
+    logger.warning(
+        f"Failed to initialize dynamic EFA instance lists: {e}. Using static fallback lists."
+    )
+    SM_EFA_NCCL_INSTANCES = SM_EFA_NCCL_INSTANCES_FALLBACK
 
 
 def _parse_args():
@@ -439,13 +529,17 @@ def _copy_prometheus_binary(prometheus_path: str) -> str:
 def _create_runtime_environment(args: argparse.Namespace, env: Any) -> Dict[str, Any]:
     """
     Create the Ray runtime environment configuration based on instance type.
+    Includes ALL current environment variables to ensure complete environment is available to Ray workers.
 
     Args:
         env: SageMaker environment object
 
     Returns:
-        Dict containing the runtime environment configuration
+        Dict containing ALL environment variables plus Ray-specific configurations
     """
+    # Start with ALL current environment variables
+    runtime_env = dict(os.environ)
+
     # Get the source_dir directory path for Ray workers
     source_dir = os.environ.get("source_dir", "")
     current_dir = os.getcwd()
@@ -454,17 +548,20 @@ def _create_runtime_environment(args: argparse.Namespace, env: Any) -> Dict[str,
     )
 
     # Get current PYTHONPATH and add our source_dir directory
-    current_pythonpath = os.environ.get("PYTHONPATH", "")
+    current_pythonpath = runtime_env.get("PYTHONPATH", "")
     if current_pythonpath:
         new_pythonpath = f"{absolute_source_dir}:{current_pythonpath}"
     else:
         new_pythonpath = absolute_source_dir
 
-    runtime_env = {
-        "NCCL_SOCKET_IFNAME": str(env.network_interface_name),
-        "NCCL_PROTO": "simple",
-        "PYTHONPATH": new_pythonpath,  # Add source_dir directory to PYTHONPATH for Ray workers
-    }
+    # Override/add specific Ray and networking environment variables
+    runtime_env.update(
+        {
+            "NCCL_SOCKET_IFNAME": str(env.network_interface_name),
+            "NCCL_PROTO": "simple",
+            "PYTHONPATH": new_pythonpath,  # Add source_dir directory to PYTHONPATH for Ray workers
+        }
+    )
 
     # Configure EFA if supported by the instance type
     if env.current_instance_type in SM_EFA_NCCL_INSTANCES:
@@ -505,7 +602,12 @@ def _create_runtime_environment(args: argparse.Namespace, env: Any) -> Dict[str,
     if runtime_env.get("RAY_GRAFANA_HOST") is not None:
         logger.info("Configured Grafana host: %s", os.environ.get("RAY_GRAFANA_HOST"))
 
+    logger.info(
+        "Ray runtime environment contains %d total environment variables",
+        len(runtime_env),
+    )
     logger.info("Ray runtime environment: %s", runtime_env)
+
     logger.info("source_dir directory added to PYTHONPATH: %s", absolute_source_dir)
     return runtime_env
 
@@ -663,6 +765,40 @@ def _run_script() -> None:
         has_failure = True
         logger.error("Error executing entry script: %s", e)
         raise
+
+
+def _run_subprocess_command_with_env(
+    command: str, env_vars: Dict[str, str], check: bool = True
+) -> Tuple[int, str, str]:
+    """
+    Run a shell command with custom environment variables and return the result.
+
+    Args:
+        command: Shell command to execute (will be parsed safely)
+        env_vars: Dictionary of environment variables to set for the process
+        check: Whether to raise an exception on non-zero exit status
+
+    Returns:
+        Tuple of (return_code, stdout, stderr)
+
+    Raises:
+        subprocess.CalledProcessError: If check is True and the command returns non-zero exit status
+    """
+    try:
+        # Parse command string into arguments to avoid shell injection
+        args = shlex.split(command)
+
+        result = subprocess.run(
+            args, shell=False, check=check, capture_output=True, text=True, env=env_vars
+        )
+        return result.returncode, result.stdout, result.stderr
+    except subprocess.CalledProcessError as e:
+        logger.error("Command '%s' failed with exit status %s", command, e.returncode)
+        logger.error("STDOUT: %s", e.stdout)
+        logger.error("STDERR: %s", e.stderr)
+        if check:
+            raise
+        return e.returncode, e.stdout, e.stderr
 
 
 def _run_subprocess_command(command: str, check: bool = True) -> Tuple[int, str, str]:
@@ -884,12 +1020,12 @@ def _setup_head_node(
         logger.info("CPUs for the head node: %s", num_cpus)
         logger.info("GPUs for the head node: %s", num_gpus)
 
-        # Build Ray start command safely
+        # Build Ray start command safely (no runtime-env option available in CLI)
         ray_cmd = f"ray start --head --num-cpus={shlex.quote(str(num_cpus))} --num-gpus={shlex.quote(str(num_gpus))} --port={DEFAULT_RAY_PORT}"
         ray_init_kwargs = {
             "address": "auto",
             "include_dashboard": args.include_dashboard,
-            "runtime_env": runtime_env,
+            "runtime_env": {"env_vars": runtime_env},
         }
 
         if args.include_dashboard:
@@ -897,7 +1033,11 @@ def _setup_head_node(
             ray_init_kwargs["dashboard_host"] = "0.0.0.0"
             ray_init_kwargs["dashboard_port"] = 8265
 
-        _run_subprocess_command(ray_cmd, check=True)
+        # Set environment variables for the Ray process
+        env_for_ray = os.environ.copy()
+        env_for_ray.update(runtime_env)
+        _run_subprocess_command_with_env(ray_cmd, env_for_ray, check=True)
+
         ray.init(**ray_init_kwargs)
 
         if args.include_dashboard and args.launch_prometheus:
@@ -1011,20 +1151,28 @@ def _setup_head_node(
         return returncode
 
 
-def _setup_worker_node(head: str) -> int:
+def _setup_worker_node(
+    head: str,
+    runtime_env: Dict[str, Any],
+) -> int:
     """Configure and run a Ray worker node.
 
     Args:
         head: Hostname of the head node
+        runtime_env: Ray runtime environment configuration
 
     Returns:
         Return code from Ray stop command
     """
     master_ip = _get_ip_from_host(head)
-    # Connect to the head node - construct command safely
+    # Connect to the head node - construct command safely (no runtime-env option available in CLI)
     ray_address = f"{master_ip}:{DEFAULT_RAY_PORT}"
     ray_start_cmd = f"ray start --address={shlex.quote(ray_address)}"
-    _run_subprocess_command(ray_start_cmd, check=True)
+
+    # Set environment variables for the Ray process
+    env_for_ray = os.environ.copy()
+    env_for_ray.update(runtime_env)
+    _run_subprocess_command_with_env(ray_start_cmd, env_for_ray, check=True)
 
     # Keep worker node alive until head node completes
     poll_count = 0
@@ -1140,12 +1288,12 @@ def _setup_single_node_ray(
 
     logger.info("Found a single host, initializing Ray as a single node")
     try:
-        # Build Ray start command
+        # Build Ray start command (no runtime-env option available in CLI)
         ray_cmd = f"ray start --head --port={DEFAULT_RAY_PORT}"
         ray_init_kwargs = {
             "address": "auto",
             "include_dashboard": args.include_dashboard,
-            "runtime_env": runtime_env,
+            "runtime_env": {"env_vars": runtime_env},
         }
 
         if args.include_dashboard:
@@ -1153,7 +1301,11 @@ def _setup_single_node_ray(
             ray_init_kwargs["dashboard_host"] = "0.0.0.0"
             ray_init_kwargs["dashboard_port"] = 8265
 
-        _run_subprocess_command(ray_cmd, check=True)
+        # Set environment variables for the Ray process
+        env_for_ray = os.environ.copy()
+        env_for_ray.update(runtime_env)
+        _run_subprocess_command_with_env(ray_cmd, env_for_ray, check=True)
+
         ray.init(**ray_init_kwargs)
 
         if args.include_dashboard and args.launch_prometheus:
@@ -1263,7 +1415,7 @@ def _setup_multi_node_ray(
     if env.current_host == head_host:
         return _setup_head_node(all_hosts, runtime_env, args, env)
     else:
-        return _setup_worker_node(head_host)
+        return _setup_worker_node(head_host, runtime_env)
 
 
 def _wait_before_shutdown(wait_shutdown: Optional[int]) -> None:
