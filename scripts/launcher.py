@@ -4,6 +4,8 @@
 
 This script serves as an entrypoint for SageMaker training jobs and handles both
 single-node and multi-node distributed workload scenarios using Ray.
+
+Supports both Python (.py) and Bash (.sh) scripts as entrypoints.
 """
 from __future__ import absolute_import
 import argparse
@@ -232,7 +234,7 @@ def _parse_args():
         "-e",
         "--entrypoint",
         type=str,
-        help="Entry point script path (e.g., training/train.py or ./training/train.py)",
+        help="Entry point script path (e.g., training/train.py, ./training/train.py, or training/train.sh)",
     )
 
     parser.add_argument(
@@ -612,14 +614,20 @@ def _create_runtime_environment(args: argparse.Namespace, env: Any) -> Dict[str,
     return runtime_env
 
 
-def _execute_entry_script() -> None:
+def _execute_entry_script(
+    runtime_env: Dict[str, Any],
+) -> None:
     """Execute the entry script dynamically based on environment variables.
 
-    This function loads and executes the script as if it were run directly,
-    triggering the 'if __name__ == "__main__":' block.
+    This function loads and executes the script based on its file extension:
+    - .py files: Loaded as Python modules and executed
+    - .sh files: Executed as bash scripts
+
+    Args:
+        runtime_env: Ray runtime environment configuration
 
     Raises:
-        ValueError: If required environment variables are not set
+        ValueError: If required environment variables are not set or unsupported file type
         FileNotFoundError: If the script file cannot be found
         Exception: If there are errors during script execution
     """
@@ -663,25 +671,18 @@ def _execute_entry_script() -> None:
     if not os.path.exists(script_path):
         raise FileNotFoundError(f"Entry script not found: {script_path}")
 
+    # Determine script type based on file extension
+    script_extension = os.path.splitext(entry_script)[1].lower()
+
     try:
-        # Change to the absolute source directory so relative imports work
-        os.chdir(absolute_source_dir)
-        logger.info("Changed working directory to: %s", absolute_source_dir)
-        logger.info("Current working directory after change: %s", os.getcwd())
-        logger.info("Contents of current directory: %s", os.listdir("."))
-
-        # Add the absolute source directory to Python path if not already there
-        if absolute_source_dir not in sys.path:
-            sys.path.insert(0, absolute_source_dir)
-            logger.info("Added %s to sys.path", absolute_source_dir)
-
-        # Use importlib to load and execute the script
-        # We are calling the module as __main__ to ensure it runs as a script
-        logger.info("Loading and executing script using importlib...")
-
-        spec = importlib.util.spec_from_file_location("__main__", script_path)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
+        if script_extension == ".py":
+            _execute_python_script(script_path, absolute_source_dir)
+        elif script_extension == ".sh":
+            _execute_bash_script(script_path, absolute_source_dir, runtime_env)
+        else:
+            raise ValueError(
+                f"Unsupported script type: {script_extension}. Only .py and .sh files are supported."
+            )
 
         logger.info("Script execution completed successfully")
 
@@ -697,6 +698,89 @@ def _execute_entry_script() -> None:
         # Restore original working directory
         os.chdir(current_dir)
         logger.info("Restored working directory to: %s", current_dir)
+
+
+def _execute_python_script(script_path: str, absolute_source_dir: str) -> None:
+    """Execute a Python script using importlib.
+
+    Args:
+        script_path: Full path to the Python script
+        absolute_source_dir: Absolute path to the source directory
+    """
+    # Change to the absolute source directory so relative imports work
+    os.chdir(absolute_source_dir)
+    logger.info("Changed working directory to: %s", absolute_source_dir)
+    logger.info("Current working directory after change: %s", os.getcwd())
+    logger.info("Contents of current directory: %s", os.listdir("."))
+
+    # Add the absolute source directory to Python path if not already there
+    if absolute_source_dir not in sys.path:
+        sys.path.insert(0, absolute_source_dir)
+        logger.info("Added %s to sys.path", absolute_source_dir)
+
+    # Use importlib to load and execute the script
+    # We are calling the module as __main__ to ensure it runs as a script
+    logger.info("Loading and executing Python script using importlib...")
+
+    spec = importlib.util.spec_from_file_location("__main__", script_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+
+def _execute_bash_script(
+    script_path: str,
+    absolute_source_dir: str,
+    runtime_env: Dict[str, Any],
+) -> None:
+    """Execute a bash script using subprocess.
+
+    Args:
+        script_path: Full path to the bash script
+        absolute_source_dir: Absolute path to the source directory
+        runtime_env: Ray runtime environment configuration
+    """
+    # Change to the absolute source directory so relative paths in the script work
+    os.chdir(absolute_source_dir)
+    logger.info("Changed working directory to: %s", absolute_source_dir)
+    logger.info("Current working directory after change: %s", os.getcwd())
+    logger.info("Contents of current directory: %s", os.listdir("."))
+
+    # Make the script executable
+    try:
+        os.chmod(script_path, 0o755)
+        logger.info("Made script executable: %s", script_path)
+    except Exception as e:
+        logger.warning("Could not make script executable: %s", e)
+
+    # Execute the bash script
+    logger.info("Executing bash script: %s", script_path)
+
+    # Use subprocess to run the bash script
+    try:
+        result = subprocess.run(
+            ["bash", script_path],
+            check=True,
+            capture_output=True,
+            text=True,
+            env=runtime_env,
+            cwd=absolute_source_dir,
+        )
+
+        # Log the output
+        if result.stdout:
+            logger.info("Script stdout:\n%s", result.stdout)
+        if result.stderr:
+            logger.info("Script stderr:\n%s", result.stderr)
+
+        logger.info("Bash script completed with return code: %s", result.returncode)
+
+    except subprocess.CalledProcessError as e:
+        logger.error("Bash script failed with return code: %s", e.returncode)
+        if e.stdout:
+            logger.error("Script stdout:\n%s", e.stdout)
+        if e.stderr:
+            logger.error("Script stderr:\n%s", e.stderr)
+        raise
 
 
 def _get_ip_from_host(host):
@@ -755,11 +839,18 @@ def _read_and_log_prometheus_logs(log_file_path: str) -> None:
         logger.error("Error reading log file %s: %s", log_file_path, e)
 
 
-def _run_script() -> None:
-    """Execute the dynamically loaded entry script."""
+def _run_script(
+    runtime_env: Dict[str, Any],
+) -> None:
+    """
+    Execute the dynamically loaded entry script.
+
+    Args:
+        runtime_env: Ray runtime environment configuration
+    """
     global has_failure
     try:
-        _execute_entry_script()
+        _execute_entry_script(runtime_env)
         logger.info("Entry script execution complete")
     except Exception as e:
         has_failure = True
@@ -1132,7 +1223,7 @@ def _setup_head_node(
                 logger.info("Currently connected nodes: %s", curr_nodes)
 
         logger.info("All nodes connected to the Ray cluster!")
-        _run_script()
+        _run_script(runtime_env)
 
     except Exception as e:
         has_failure = True
@@ -1371,7 +1462,7 @@ def _setup_single_node_ray(
             # _read_and_log_prometheus_logs("/tmp/prometheus_stdout.log")
 
         ray_initialized = True
-        _run_script()
+        _run_script(runtime_env)
     except Exception as e:
         has_failure = True
         logger.error("Error in single-node setup or script execution: %s", e)
