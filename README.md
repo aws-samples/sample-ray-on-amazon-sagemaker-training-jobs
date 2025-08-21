@@ -394,9 +394,6 @@ model_trainer = ModelTrainer(
     base_job_name=job_name,
     compute=compute_configs,
     stopping_condition=StoppingCondition(max_runtime_in_seconds=18000),
-    environment={
-        "RAY_gcs_server_request_timeout_seconds": "120",
-    },
     hyperparameters={
         "config": "/opt/ml/input/data/config/args.yaml"  # path to TRL config which was uploaded to s3
     },
@@ -434,10 +431,6 @@ estimator = PyTorch(
     enable_network_isolation=False,
     max_run=432000,
     image_uri=image_uri,
-    environment={
-        "RAY_gcs_server_request_timeout_seconds": "120",
-        "RAY_DATA_AUTOLOAD_PYEXTENSIONTYPE": "1",
-    },
     hyperparameters={
         "entrypoint": "train.py",
     },
@@ -524,7 +517,7 @@ model_trainer = ModelTrainer(
     compute=compute_configs,
     stopping_condition=StoppingCondition(max_runtime_in_seconds=18000),
     environment={
-        "RAY_GRAFANA_HOST": "<GRAFANA_HOST>",
+        "RAY_GRAFANA_HOST": "<GRAFANA_HOST>", # If you need Observability
         "RAY_PROMETHEUS_HOST": "<PROMETHEUS_HOST>",
         "RAY_PROMETHEUS_NAME": "prometheus",
     },
@@ -726,6 +719,7 @@ estimator = PyTorch(
     image_uri=image_uri,
     environment={
         "launch_prometheus": "true",
+        "RAY_GRAFANA_HOST": "<GRAFANA_HOST>",
     },
     hyperparameters={
         "entrypoint": "train.py",
