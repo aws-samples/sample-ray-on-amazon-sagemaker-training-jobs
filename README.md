@@ -477,6 +477,8 @@ To allow system metrics collection through Prometheus and Grafana on the SageMak
 
 With this approach, both Prometheus and Grafana server should be deployed on an external system.
 
+⚠️ Internet connectivity is the SageMaker cluster required
+
 #### Step 1: Setup IAM Permissions:
 
 Please refer to the official [AWS Documentation](https://docs.aws.amazon.com/sagemaker/latest/dg/train-remote-debugging.html#train-remote-debugging-iam)
@@ -634,6 +636,8 @@ Access the Ray Dashboard from your browser: `localhost:8265`:
 ### Local Prometheus on the SageMaker cluster and Grafana running on an external server
 
 Ray provides the capability to run local prometheus to collect system metrics during the execution of the workload. With this approach, a Grafana server deployed on an external system is required to get access to the metric visualizations.
+
+⚠️ Internet connectivity is the SageMaker cluster required
 
 #### Step 1: Setup IAM Permissions:
 
