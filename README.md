@@ -14,8 +14,9 @@ This repository demonstrates how to use Ray for distributed data processing and 
   - [Script definition](#script-definition)
 - [Example Usage](#example-usage)
 - [Ray Dashboard](#ray-dashboard)
-- [Ray Dashboard with Prometheus and Grafana integration](#ray-dashboard-with-prometheus-and-grafana-integration)
-- [Ray Dashboard with local Prometheus and Grafana integration](#ray-dashboard-with-local-prometheus-and-grafana-integration)
+- [Observability with Prometheus and Grafana](#observability-with-prometheus-and-grafana)
+  - [Prometheus and Grafana hosted in an external server](#prometheus-and-grafana-hosted-in-an-external-server)
+  - [Local Prometheus on the SageMaker cluster and Grafana running on an external server](#local-prometheus-on-the-sagemaker-cluster-and-grafana-running-on-an-external-server)
 
 ## Prerequisites
 
@@ -468,19 +469,23 @@ Access the Ray Dashboard from your browser: `localhost:8265`:
 
 ![Ray Dashboard](./images/ray_dashboard.png)
 
-## Ray Dashboard with Prometheus and Grafana integration
+## Observability with Prometheus and Grafana
 
-For accessing the Ray Dashboard with Prometheus running on the SageMaker cluster and Grafana integration, during the execution of Ray workload, we can leverage the native feature to access [SageMaker training jobs by using AWS System Manager (SSM)](https://docs.aws.amazon.com/sagemaker/latest/dg/train-remote-debugging.html)
+To allow system metrics collection through Prometheus and Grafana on the SageMaker cluster during the execution of the Ray workload, we can leverage the native feature to access [SageMaker training jobs by using AWS System Manager (SSM)](https://docs.aws.amazon.com/sagemaker/latest/dg/train-remote-debugging.html)
 
-### Step 1: Setup IAM Permissions:
+### Prometheus and Grafana hosted in an external server
+
+With this approach, both Prometheus and Grafana server should be deployed on an external system.
+
+#### Step 1: Setup IAM Permissions:
 
 Please refer to the official [AWS Documentation](https://docs.aws.amazon.com/sagemaker/latest/dg/train-remote-debugging.html#train-remote-debugging-iam)
 
-### Step 2:
+#### Step 2:
 
 Enable remote debugging for SageMaker training jobs:
 
-#### Option 1: ModelTrainer class
+##### Option 1: ModelTrainer class
 
 ```python
 from sagemaker.modules.configs import (
@@ -532,7 +537,7 @@ model_trainer = ModelTrainer(
 ).with_remote_debug_config(RemoteDebugConfig(enable_remote_debug=True))
 ```
 
-#### Option 2: PyTorch Estimator
+##### Option 2: PyTorch Estimator
 
 ```python
 from sagemaker.pytorch import PyTorch
@@ -570,7 +575,7 @@ estimator = PyTorch(
 )
 ```
 
-### Step 3 - Port Forwarding to the Prometheus port in the Grafana server environment:
+#### Step 3 - Port Forwarding to the Prometheus port in the Grafana server environment:
 
 To make sure your Grafana server will collect the captured metrics by Prometheus, we have to access the training container, by starting a Port Forwarding to the port `8080` (Default port where Ray exports metrics) with the following command:
 
@@ -588,7 +593,7 @@ In a multi-node cluster, you can check the head node by investigating the CloudW
 2025-06-25 08:47:18,755 - __main__ - INFO - Head node: algo-1, Current host: algo-3
 ```
 
-### Step 4 - Configure prometheus.yml to scrape metrics on the local port:
+#### Step 4 - Configure prometheus.yml to scrape metrics on the local port:
 
 Configure your `prometheus.yml` file to scrape metrics on the local port where you are forwarding the Ray metrics:
 
@@ -602,7 +607,7 @@ scrape_configs:
   ...
 ```
 
-### Step 5 - Port Forwarding to the Ray Dashboard port:
+#### Step 5 - Port Forwarding to the Ray Dashboard port:
 
 Access the training container, by starting a Port Forwarding to the port `8265` (Default Ray Dashboard port) with the following command:
 
@@ -620,25 +625,25 @@ In a multi-node cluster, you can check the head node by investigating the CloudW
 2025-06-25 08:47:18,755 - __main__ - INFO - Head node: algo-1, Current host: algo-3
 ```
 
-### Step 6:
+#### Step 6:
 
 Access the Ray Dashboard from your browser: `localhost:8265`:
 
 ![Ray Dashboard](./images/ray_dashboard_grafana.png)
 
-## Ray Dashboard with local Prometheus and Grafana integration
+### Local Prometheus on the SageMaker cluster and Grafana running on an external server
 
-For accessing the Ray Dashboard with local Prometheus running on the SageMaker cluster and Grafana integration, during the execution of Ray workload, we can leverage the native feature to access [SageMaker training jobs by using AWS System Manager (SSM)](https://docs.aws.amazon.com/sagemaker/latest/dg/train-remote-debugging.html)
+Ray provides the capability to run local prometheus to collect system metrics during the execution of the workload. With this approach, a Grafana server deployed on an external system is required to get access to the metric visualizations.
 
-### Step 1: Setup IAM Permissions:
+#### Step 1: Setup IAM Permissions:
 
 Please refer to the official [AWS Documentation](https://docs.aws.amazon.com/sagemaker/latest/dg/train-remote-debugging.html#train-remote-debugging-iam)
 
-### Step 2:
+#### Step 2:
 
 Enable remote debugging for SageMaker training jobs:
 
-#### Option 1: ModelTrainer class
+##### Option 1: ModelTrainer class
 
 ```python
 from sagemaker.modules.configs import (
@@ -677,8 +682,6 @@ model_trainer = ModelTrainer(
     environment={
         "launch_prometheus": "true",
         "RAY_GRAFANA_HOST": "<GRAFANA_HOST>",
-        "RAY_PROMETHEUS_HOST": "<PROMETHEUS_HOST>"
-        "RAY_PROMETHEUS_NAME": "prometheus",
     },
     hyperparameters={
         "config": "/opt/ml/input/data/config/args.yaml"  # path to TRL config which was uploaded to s3
@@ -691,7 +694,7 @@ model_trainer = ModelTrainer(
 ).with_remote_debug_config(RemoteDebugConfig(enable_remote_debug=True))
 ```
 
-#### Option 2: PyTorch Estimator
+##### Option 2: PyTorch Estimator
 
 ```python
 from sagemaker.pytorch import PyTorch
@@ -719,8 +722,6 @@ estimator = PyTorch(
     image_uri=image_uri,
     environment={
         "launch_prometheus": "true",
-        "RAY_GRAFANA_HOST": "<GRAFANA_HOST>",
-        "RAY_PROMETHEUS_NAME": "prometheus",
     },
     hyperparameters={
         "entrypoint": "train.py",
@@ -729,7 +730,7 @@ estimator = PyTorch(
 )
 ```
 
-### Step 3 - Port Forwarding to the Prometheus port in the Grafana server environment:
+#### Step 3 - Port Forwarding to the Prometheus port in the Grafana server environment:
 
 To make sure your Grafana server will collect the captured metrics by Prometheus, we have to access the training container, by starting a Port Forwarding to the port `9090` (Default Prometheus port) with the following command:
 
@@ -747,7 +748,7 @@ In a multi-node cluster, you can check the head node by investigating the CloudW
 2025-06-25 08:47:18,755 - __main__ - INFO - Head node: algo-1, Current host: algo-3
 ```
 
-### Step 4 - Port Forwarding to the Ray Dashboard port:
+#### Step 4 - Port Forwarding to the Ray Dashboard port:
 
 Access the training container, by starting a Port Forwarding to the port `8265` (Default Ray Dashboard port) with the following command:
 
@@ -765,17 +766,17 @@ In a multi-node cluster, you can check the head node by investigating the CloudW
 2025-06-25 08:47:18,755 - __main__ - INFO - Head node: algo-1, Current host: algo-3
 ```
 
-### Step 5:
+#### Step 5:
 
 Access the Ray Dashboard from your browser: `localhost:8265`:
 
 ![Ray Dashboard](./images/ray_dashboard_grafana.png)
 
-### (Optional) Provide prometheus binary file
+##### (Optional) Provide prometheus binary file
 
 By default, Ray downloads the Prometheus binary from the internet when launching Prometheus for metrics collection. In environments with limited internet connectivity or for better control over dependencies, you can pre-download the Prometheus binary, upload it to S3, and provide it as a training parameter.
 
-#### Step 1: Download Prometheus Binary
+###### Step 1: Download Prometheus Binary
 
 Download the appropriate Prometheus binary for your target environment (typically Linux AMD64 for SageMaker training instances):
 
@@ -783,7 +784,7 @@ Download the appropriate Prometheus binary for your target environment (typicall
 wget https://github.com/prometheus/prometheus/releases/download/v3.4.2/prometheus-3.4.2.linux-amd64.tar.gz
 ```
 
-#### Step 2: Upload to S3
+###### Step 2: Upload to S3
 
 Upload the downloaded binary to your S3 bucket:
 
@@ -815,7 +816,7 @@ s3_client.upload_file(
 print(f"Prometheus binary uploaded to: {prometheus_s3_path}")
 ```
 
-#### Step 3: Configure Training Input
+###### Step 3: Configure Training Input
 
 Add the Prometheus binary as a training input channel:
 
@@ -838,7 +839,7 @@ data = {
 }
 ```
 
-#### Step 4: Configure Environment Variables and Hyperparameters
+###### Step 4: Configure Environment Variables and Hyperparameters
 
 Configure your estimator to use the provided Prometheus binary with the required environment variables:
 
@@ -853,7 +854,6 @@ estimator = PyTorch(
         "head_num_gpus": "0",
         "launch_prometheus": "true",  # Enable Prometheus launch
         "RAY_GRAFANA_HOST": "<GRAFANA_HOST>",  # Replace with your Grafana host
-        "RAY_PROMETHEUS_NAME": "prometheus"  # Prometheus service name
     },
     hyperparameters={
         "entrypoint": "train_ray.py",
