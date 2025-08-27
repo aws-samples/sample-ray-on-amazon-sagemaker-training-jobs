@@ -867,3 +867,7 @@ estimator = PyTorch(
 [Bruno Pistone](https://it.linkedin.com/in/bpistone) - Sr. WW Gen AI/ML Specialist Solutions Architect - Amazon SageMaker AI
 
 [Giuseppe A. Porcelli](https://it.linkedin.com/in/giuporcelli) - Principal, ML Specialist Solutions Architect - Amazon SageMaker AI
+
+## Stats
+
+![Badge](https://hitscounter.dev/api/hit?url=https%3A%2F%2Fgithub.com%2Faws-samples%2Fsample-ray-on-amazon-sagemaker-training-jobs&label=Visitors&icon=heart-fill&color=%23198754&message=&style=flat&tz=UTC)
