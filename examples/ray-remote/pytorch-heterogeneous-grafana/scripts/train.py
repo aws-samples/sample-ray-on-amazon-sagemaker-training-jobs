@@ -224,7 +224,7 @@ def transform_data(df):
         raise e
 
 
-@ray.remote(num_gpus=1, num_cpus=2)
+@ray.remote(num_cpus=2)
 def train_func(args, train, test):
     X_train, y_train = train["text"], train["labels"].values
     X_test, y_test = test["text"], test["labels"].values
