@@ -48,6 +48,10 @@ class ScriptArguments:
     Arguments for the script execution.
     """
 
+    use_checkpoints: bool = field(
+        default=False, metadata={"help": "Whether to use checkpointing"}
+    )
+
     checkpoint_dir: str = field(default=None, metadata={"help": "Checkpoint directory"})
 
     lora_r: Optional[int] = field(default=8, metadata={"help": "lora_r"})
@@ -631,13 +635,19 @@ def train_func(config):
                 logger.warning(f"Failed to log dataset to MLflow: {e}")
 
             # Resume training from checkpoint if available
-            if get_last_checkpoint(script_args.checkpoint_dir) is not None:
+            if (
+                get_last_checkpoint(script_args.checkpoint_dir) is not None
+                and script_args.use_checkpoints
+            ):
                 trainer.train(resume_from_checkpoint=True)
             else:
                 trainer.train()
     else:
         # Resume training from checkpoint if available
-        if get_last_checkpoint(script_args.checkpoint_dir) is not None:
+        if (
+            get_last_checkpoint(script_args.checkpoint_dir) is not None
+            and script_args.use_checkpoints
+        ):
             trainer.train(resume_from_checkpoint=True)
         else:
             trainer.train()
