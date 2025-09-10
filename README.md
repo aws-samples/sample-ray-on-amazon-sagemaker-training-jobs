@@ -68,6 +68,7 @@ The `launcher.py` script requires specific parameters to execute your custom tra
 | `--head-num-gpus`       | int    | No       | Instance default | Number of GPUs reserved for head node                                    |
 | `--include-dashboard`   | bool   | No       | True             | Enable Ray dashboard                                                     |
 | `--launch-prometheus`   | bool   | No       | False            | Launch local Prometheus on the head node. Internet connectivity required |
+| `--prometheus-path`     | string | No       | None             | Path to prometheus binary if provided as InputData                       |
 | `--wait-shutdown`       | int    | No       | None             | Seconds to wait before Ray shutdown                                      |
 
 \*Required if `entry_script` environment variable is not set  
@@ -81,6 +82,7 @@ The `launcher.py` script requires specific parameters to execute your custom tra
 | `head_num_cpus`       | int    | No       | Alternative way to set number of CPUs reserved for head node                                |
 | `head_num_gpus`       | int    | No       | Alternative way to set number of GPUs reserved for head node                                |
 | `launch_prometheus`   | bool   | No       | Alternative way to launch local Prometheus on the head node. Internet connectivity required |
+| `prometheus_path`     | string | No       | Path to prometheus binary if provided as InputData                                          |
 | `wait_shutdown`       | int    | No       | Alternative way to set shutdown wait time                                                   |
 
 \*Required if `--entrypoint` argument is not provided
@@ -868,6 +870,4 @@ estimator = PyTorch(
 
 [Giuseppe A. Porcelli](https://it.linkedin.com/in/giuporcelli) - Principal, ML Specialist Solutions Architect - Amazon SageMaker AI
 
-
 ![Badge](https://hitscounter.dev/api/hit?url=https%3A%2F%2Fgithub.com%2Faws-samples%2Fsample-ray-on-amazon-sagemaker-training-jobs&label=Hits&icon=heart-fill&color=%23198754&message=&style=flat&tz=UTC)
-

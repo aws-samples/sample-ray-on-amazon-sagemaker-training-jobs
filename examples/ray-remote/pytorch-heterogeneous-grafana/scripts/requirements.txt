@@ -1,5 +1,0 @@
-boto3
-emoji
-ray[data,train,tune,serve]==2.49.1
-sagemaker==2.251.1
-scikit-learn==1.7.0
