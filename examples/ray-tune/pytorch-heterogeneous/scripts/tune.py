@@ -16,6 +16,7 @@ from filelock import FileLock
 from torch.utils.data import random_split
 
 from ray import train, tune
+from ray.train import RunConfig
 from ray.tune.schedulers import ASHAScheduler
 
 
@@ -23,10 +24,6 @@ def parse_args():
     """Parse command line arguments for hyperparameters."""
     parser = ArgumentParser()
 
-    parser.add_argument("--l1", type=int, default=None, help="L1 layer size")
-    parser.add_argument("--l2", type=int, default=None, help="L2 layer size")
-    parser.add_argument("--lr", type=float, default=None, help="Learning rate")
-    parser.add_argument("--batch_size", type=int, default=None, help="Batch size")
     parser.add_argument(
         "--max_epochs", type=int, default=None, help="Maximum number of epochs"
     )
@@ -135,16 +132,6 @@ def train_cifar(config):
         net.parameters(), lr=config["lr"], momentum=0.9, weight_decay=5e-5
     )
 
-    # Load existing checkpoint through `get_checkpoint()` API.
-    if tune.get_checkpoint():
-        loaded_checkpoint = tune.get_checkpoint()
-        with loaded_checkpoint.as_directory() as loaded_checkpoint_dir:
-            model_state, optimizer_state = torch.load(
-                os.path.join(loaded_checkpoint_dir, "checkpoint.pt")
-            )
-            net.load_state_dict(model_state)
-            optimizer.load_state_dict(optimizer_state)
-
     # Data setup
     if config["smoke_test"]:
         trainset, _ = load_test_data()
@@ -190,16 +177,8 @@ def train_cifar(config):
             "accuracy": correct / total,
         }
 
-        # Here we save a checkpoint. It is automatically registered with
-        # Ray Tune and will potentially be accessed through in ``get_checkpoint()``
-        # in future iterations.
-        # Note to save a file-like checkpoint, you still need to put it under a directory
-        # to construct a checkpoint.
-        with tempfile.TemporaryDirectory() as temp_checkpoint_dir:
-            path = os.path.join(temp_checkpoint_dir, "checkpoint.pt")
-            torch.save((net.state_dict(), optimizer.state_dict()), path)
-            checkpoint = tune.Checkpoint.from_directory(temp_checkpoint_dir)
-            tune.report(metrics, checkpoint=checkpoint)
+        # Report metrics without checkpoint
+        tune.report(metrics)
     print("Finished Training!")
 
 
@@ -210,17 +189,35 @@ def test_best_model(best_result, smoke_test=False):
         best_trained_model = nn.DataParallel(best_trained_model)
     best_trained_model.to(device)
 
-    checkpoint_path = os.path.join(
-        best_result.checkpoint.to_directory(), "checkpoint.pt"
+    # Skip checkpoint loading since we're not using checkpoints
+    # Train a fresh model with best config for final evaluation
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.SGD(
+        best_trained_model.parameters(),
+        lr=best_result.config["lr"],
+        momentum=0.9,
+        weight_decay=5e-5,
     )
 
-    model_state, _optimizer_state = torch.load(checkpoint_path)
-    best_trained_model.load_state_dict(model_state)
-
     if smoke_test:
-        _trainset, testset = load_test_data()
+        trainset, testset = load_test_data()
     else:
-        _trainset, testset = load_data()
+        trainset, testset = load_data()
+
+    train_loader, _ = create_dataloaders(
+        trainset, best_result.config["batch_size"], num_workers=0 if smoke_test else 8
+    )
+
+    # Quick training with best config
+    best_trained_model.train()
+    for epoch in range(min(3, best_result.config["max_num_epochs"])):
+        for inputs, labels in train_loader:
+            inputs, labels = inputs.to(device), labels.to(device)
+            optimizer.zero_grad()
+            outputs = best_trained_model(inputs)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
 
     testloader = torch.utils.data.DataLoader(
         testset, batch_size=4, shuffle=False, num_workers=2
@@ -250,20 +247,10 @@ if __name__ == "__main__":
     args = parse_args()
 
     config = {
-        "l1": (
-            args.l1
-            if args.l1
-            else tune.sample_from(lambda _: 2 ** np.random.randint(2, 9))
-        ),
-        "l2": (
-            args.l2
-            if args.l2
-            else tune.sample_from(lambda _: 2 ** np.random.randint(2, 9))
-        ),
-        "lr": args.lr if args.lr else tune.loguniform(1e-4, 1e-1),
-        "batch_size": (
-            args.batch_size if args.batch_size else tune.choice([2, 4, 8, 16])
-        ),
+        "l1": (tune.sample_from(lambda _: 2 ** np.random.randint(2, 9))),
+        "l2": (tune.sample_from(lambda _: 2 ** np.random.randint(2, 9))),
+        "lr": tune.loguniform(1e-4, 1e-1),
+        "batch_size": tune.choice([2, 4, 8, 16]),
         "smoke_test": args.smoke_test,
         "num_trials": 10 if not args.smoke_test else 2,
         "max_num_epochs": (

@@ -16,6 +16,7 @@ from filelock import FileLock
 from torch.utils.data import random_split
 
 from ray import train, tune
+from ray.train import RunConfig
 from ray.tune.schedulers import ASHAScheduler
 
 
@@ -23,10 +24,6 @@ def parse_args():
     """Parse command line arguments for hyperparameters."""
     parser = ArgumentParser()
 
-    parser.add_argument("--l1", type=int, default=None, help="L1 layer size")
-    parser.add_argument("--l2", type=int, default=None, help="L2 layer size")
-    parser.add_argument("--lr", type=float, default=None, help="Learning rate")
-    parser.add_argument("--batch_size", type=int, default=None, help="Batch size")
     parser.add_argument(
         "--max_epochs", type=int, default=None, help="Maximum number of epochs"
     )
@@ -250,20 +247,10 @@ if __name__ == "__main__":
     args = parse_args()
 
     config = {
-        "l1": (
-            args.l1
-            if args.l1
-            else tune.sample_from(lambda _: 2 ** np.random.randint(2, 9))
-        ),
-        "l2": (
-            args.l2
-            if args.l2
-            else tune.sample_from(lambda _: 2 ** np.random.randint(2, 9))
-        ),
-        "lr": args.lr if args.lr else tune.loguniform(1e-4, 1e-1),
-        "batch_size": (
-            args.batch_size if args.batch_size else tune.choice([2, 4, 8, 16])
-        ),
+        "l1": (tune.sample_from(lambda _: 2 ** np.random.randint(2, 9))),
+        "l2": (tune.sample_from(lambda _: 2 ** np.random.randint(2, 9))),
+        "lr": tune.loguniform(1e-4, 1e-1),
+        "batch_size": tune.choice([2, 4, 8, 16]),
         "smoke_test": args.smoke_test,
         "num_trials": 10 if not args.smoke_test else 2,
         "max_num_epochs": (
@@ -289,6 +276,9 @@ if __name__ == "__main__":
             mode="min",
             scheduler=scheduler,
             num_samples=config["num_trials"],
+        ),
+        run_config=RunConfig(
+            storage_path="/opt/ml/output/data"  # Use SageMaker's shared output directory
         ),
         param_space=config,
     )
