@@ -64,6 +64,7 @@ DEFAULT_FAILURE_CODE = 1
 DEFAULT_RAY_PORT = 6379
 RAY_WORKER_POLL_INTERVAL = 10  # seconds
 RAY_CONNECTION_TIMEOUT = 300  # seconds (5 minutes)
+RAY_WORKER_MAX_WAIT_TIME = 300
 
 # Prometheus timer
 PROMETHEUS_WAIT_SECONDS = 300
@@ -745,13 +746,6 @@ def _execute_bash_script(
     logger.info("Current working directory after change: %s", os.getcwd())
     logger.info("Contents of current directory: %s", os.listdir("."))
 
-    # Make the script executable
-    try:
-        os.chmod(script_path, 0o755)
-        logger.info("Made script executable: %s", script_path)
-    except Exception as e:
-        logger.warning("Could not make script executable: %s", e)
-
     # Execute the bash script
     logger.info("Executing bash script: %s", script_path)
 
@@ -858,6 +852,25 @@ def _run_script(
         raise
 
 
+def _validate_command(args: List[str]) -> None:
+    """Validate that command uses only allowed executables.
+
+    Args:
+        args: Command arguments list
+
+    Raises:
+        ValueError: If command is not allowed
+    """
+    if not args:
+        raise ValueError("Empty command not allowed")
+
+    executable = args[0]
+    if executable in ["ray", "bash"] or executable.startswith("./prometheus-"):
+        return
+
+    raise ValueError(f"Command not allowed: {executable}")
+
+
 def _run_subprocess_command_with_env(
     command: str, env_vars: Dict[str, str], check: bool = True
 ) -> Tuple[int, str, str]:
@@ -878,6 +891,7 @@ def _run_subprocess_command_with_env(
     try:
         # Parse command string into arguments to avoid shell injection
         args = shlex.split(command)
+        _validate_command(args)
 
         result = subprocess.run(
             args, shell=False, check=check, capture_output=True, text=True, env=env_vars
@@ -909,6 +923,7 @@ def _run_subprocess_command(command: str, check: bool = True) -> Tuple[int, str,
     try:
         # Parse command string into arguments to avoid shell injection
         args = shlex.split(command)
+        _validate_command(args)
 
         result = subprocess.run(
             args, shell=False, check=check, capture_output=True, text=True
@@ -961,15 +976,24 @@ def _run_subprocess_command_async(
     try:
         # Parse command string into arguments to avoid shell injection
         args = shlex.split(command)
+        _validate_command(args)
 
-        # Set up stdout redirection
+        # Validate and set up stdout redirection
         if stdout_file:
+            # Validate file path to prevent directory traversal
+            if ".." in stdout_file or stdout_file.startswith("/"):
+                if not stdout_file.startswith("/tmp/"):
+                    raise ValueError(f"Invalid stdout file path: {stdout_file}")
             stdout = open(stdout_file, "w")
         else:
             stdout = subprocess.PIPE
 
-        # Set up stderr redirection
+        # Validate and set up stderr redirection
         if stderr_file:
+            # Validate file path to prevent directory traversal
+            if ".." in stderr_file or stderr_file.startswith("/"):
+                if not stderr_file.startswith("/tmp/"):
+                    raise ValueError(f"Invalid stderr file path: {stderr_file}")
             stderr = open(stderr_file, "w")
         else:
             stderr = subprocess.PIPE
@@ -993,6 +1017,12 @@ def _run_subprocess_command_async(
 
         logger.info("Async process started with PID: %s", process.pid)
 
+        # Close file handles immediately after Popen since they're now owned by the subprocess
+        if stdout_file and stdout != subprocess.PIPE:
+            stdout.close()
+        if stderr_file and stderr != subprocess.PIPE:
+            stderr.close()
+
         # Wait for specified seconds if requested
         if wait_in_seconds > 0:
             logger.info("Waiting %s seconds after starting process...", wait_in_seconds)
@@ -1015,9 +1045,9 @@ def _run_subprocess_command_async(
     except Exception as e:
         logger.error("Error starting async command '%s': %s", command, e)
         # Clean up file handles if they were opened
-        if stdout_file and "stdout" in locals() and stdout != subprocess.PIPE:
+        if stdout_file and "stdout" in locals() and hasattr(stdout, "close"):
             stdout.close()
-        if stderr_file and "stderr" in locals() and stderr != subprocess.PIPE:
+        if stderr_file and "stderr" in locals() and hasattr(stderr, "close"):
             stderr.close()
         raise
 
@@ -1267,6 +1297,7 @@ def _setup_worker_node(
 
     # Keep worker node alive until head node completes
     poll_count = 0
+
     while _is_ray_alive():
         time.sleep(RAY_WORKER_POLL_INTERVAL)
         poll_count += 1
