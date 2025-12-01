@@ -220,7 +220,7 @@ model_trainer = ModelTrainer(
     base_job_name=job_name,
     compute=compute_configs,
     environment={
-        "entrypoint": "training/train.py",           # Look in training/ subdirectory containing your entry script, under SourceCode `source_dir`
+        "entry_script": "training/train.py",           # Look in training/ subdirectory containing your entry script, under SourceCode `source_dir`
     },
     hyperparameters={
         "epochs": 25,
