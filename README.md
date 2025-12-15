@@ -62,8 +62,8 @@ The `launcher.py` script requires specific parameters to execute your custom tra
 
 | Argument                | Type   | Required | Default          | Description                                                              |
 | ----------------------- | ------ | -------- | ---------------- | ------------------------------------------------------------------------ |
-| `--entrypoint`          | string | No\*     | None             | Path to your script (e.g., `training/train.py`)                          |
-| `--head-instance-group` | string | Yes\*\*  | None             | Instance group name for Ray head node (heterogeneous clusters only)      |
+| `--entrypoint`          | string | Yes      | None             | Path to your script (e.g., `training/train.py`)                          |
+| `--head-instance-group` | string | Yes\*    | None             | Instance group name for Ray head node (heterogeneous clusters only)      |
 | `--head-num-cpus`       | int    | No       | Instance default | Number of CPUs reserved for head node                                    |
 | `--head-num-gpus`       | int    | No       | Instance default | Number of GPUs reserved for head node                                    |
 | `--include-dashboard`   | bool   | No       | True             | Enable Ray dashboard                                                     |
@@ -71,8 +71,7 @@ The `launcher.py` script requires specific parameters to execute your custom tra
 | `--prometheus-path`     | string | No       | None             | Path to prometheus binary if provided as InputData                       |
 | `--wait-shutdown`       | int    | No       | None             | Seconds to wait before Ray shutdown                                      |
 
-\*Required if `entry_script` environment variable is not set  
-\*\*Required only for heterogeneous clusters
+\*Required only for heterogeneous clusters
 
 ### Environment Variables Reference
 
@@ -84,8 +83,6 @@ The `launcher.py` script requires specific parameters to execute your custom tra
 | `launch_prometheus`   | bool   | No       | Alternative way to launch local Prometheus on the head node. Internet connectivity required |
 | `prometheus_path`     | string | No       | Path to prometheus binary if provided as InputData                                          |
 | `wait_shutdown`       | int    | No       | Alternative way to set shutdown wait time                                                   |
-
-\*Required if `--entrypoint` argument is not provided
 
 ### Script definition
 
@@ -111,18 +108,11 @@ if __name__ == "__main__":
 
 The launcher script has been designed to be flexible and dynamic, allowing you to specify any entry script through arguments or environment variables, rather than hardcoded imports.
 
-### Option 1: Entrypoint Argument
+### Entrypoint Argument
 
 The launcher uses one argument:
 
 - `--entrypoint`: Path to the script to execute (must contain `if __name__ == "__main__":` block)
-
-### Option 2: Environment Variables (compatibility with SageMaker Python SDK Estimator)
-
-The launcher uses two key environment variables:
-
-- `source_dir`: The directory containing your entry script, under Estimator `source_dir`
-- `entry_script`: The Python file to execute (must contain `if __name__ == "__main__":` block)
 
 ### Usage Examples
 
@@ -219,10 +209,8 @@ model_trainer = ModelTrainer(
     source_code=source_code,
     base_job_name=job_name,
     compute=compute_configs,
-    environment={
-        "entry_script": "training/train.py",           # Look in training/ subdirectory containing your entry script, under SourceCode `source_dir`
-    },
     hyperparameters={
+        "entrypoint": "training/train.py",          # Look in training/ subdirectory containing your entry script, under SourceCode `source_dir`
         "epochs": 25,
         "learning_rate": 0.001,
         "batch_size": 100,
