@@ -6,7 +6,7 @@ datasets==4.0.0
 evaluate==0.4.3
 huggingface_hub[hf_transfer]
 mlflow
-ray[data,train,tune,serve]==2.49.1
+ray[data,train,tune,serve]==2.52.1
 safetensors>=0.6.2
 sagemaker==2.251.1
 sagemaker-mlflow==0.1.0

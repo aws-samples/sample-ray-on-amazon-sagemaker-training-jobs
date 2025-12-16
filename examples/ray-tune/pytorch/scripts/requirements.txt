@@ -1,3 +1,3 @@
 pandas
-ray[data,train,tune,serve]==2.49.1
+ray[data,train,tune,serve]==2.52.1
 sagemaker==2.251.1
