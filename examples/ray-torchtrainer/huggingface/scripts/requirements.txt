@@ -8,7 +8,7 @@ huggingface_hub[hf_transfer]
 mlflow
 ray[data,train,tune,serve]==2.52.1
 safetensors>=0.6.2
-sagemaker==2.251.1
+sagemaker==2.256.0
 sagemaker-mlflow==0.1.0
 sentencepiece==0.2.1
 scikit-learn==1.7.2
