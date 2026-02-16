@@ -15,8 +15,8 @@ import torchvision.transforms as transforms
 from filelock import FileLock
 from torch.utils.data import random_split
 
-from ray import train, tune
-from ray.train import RunConfig
+from ray import tune
+from ray.tune import RunConfig
 from ray.tune.schedulers import ASHAScheduler
 
 
@@ -132,6 +132,16 @@ def train_cifar(config):
         net.parameters(), lr=config["lr"], momentum=0.9, weight_decay=5e-5
     )
 
+    # Load existing checkpoint through `get_checkpoint()` API.
+    if tune.get_checkpoint():
+        loaded_checkpoint = tune.get_checkpoint()
+        with loaded_checkpoint.as_directory() as loaded_checkpoint_dir:
+            model_state, optimizer_state = torch.load(
+                os.path.join(loaded_checkpoint_dir, "checkpoint.pt")
+            )
+            net.load_state_dict(model_state)
+            optimizer.load_state_dict(optimizer_state)
+
     # Data setup
     if config["smoke_test"]:
         trainset, _ = load_test_data()
@@ -177,8 +187,16 @@ def train_cifar(config):
             "accuracy": correct / total,
         }
 
-        # Report metrics without checkpoint
-        tune.report(metrics)
+        # Here we save a checkpoint. It is automatically registered with
+        # Ray Tune and will potentially be accessed through in ``get_checkpoint()``
+        # in future iterations.
+        # Note to save a file-like checkpoint, you still need to put it under a directory
+        # to construct a checkpoint.
+        with tempfile.TemporaryDirectory() as temp_checkpoint_dir:
+            path = os.path.join(temp_checkpoint_dir, "checkpoint.pt")
+            torch.save((net.state_dict(), optimizer.state_dict()), path)
+            checkpoint = tune.Checkpoint.from_directory(temp_checkpoint_dir)
+            tune.report(metrics, checkpoint=checkpoint)
     print("Finished Training!")
 
 
@@ -189,35 +207,17 @@ def test_best_model(best_result, smoke_test=False):
         best_trained_model = nn.DataParallel(best_trained_model)
     best_trained_model.to(device)
 
-    # Skip checkpoint loading since we're not using checkpoints
-    # Train a fresh model with best config for final evaluation
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(
-        best_trained_model.parameters(),
-        lr=best_result.config["lr"],
-        momentum=0.9,
-        weight_decay=5e-5,
+    checkpoint_path = os.path.join(
+        best_result.checkpoint.to_directory(), "checkpoint.pt"
     )
+
+    model_state, _optimizer_state = torch.load(checkpoint_path)
+    best_trained_model.load_state_dict(model_state)
 
     if smoke_test:
-        trainset, testset = load_test_data()
+        _trainset, testset = load_test_data()
     else:
-        trainset, testset = load_data()
-
-    train_loader, _ = create_dataloaders(
-        trainset, best_result.config["batch_size"], num_workers=0 if smoke_test else 8
-    )
-
-    # Quick training with best config
-    best_trained_model.train()
-    for epoch in range(min(3, best_result.config["max_num_epochs"])):
-        for inputs, labels in train_loader:
-            inputs, labels = inputs.to(device), labels.to(device)
-            optimizer.zero_grad()
-            outputs = best_trained_model(inputs)
-            loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
+        _trainset, testset = load_data()
 
     testloader = torch.utils.data.DataLoader(
         testset, batch_size=4, shuffle=False, num_workers=2
@@ -276,6 +276,9 @@ if __name__ == "__main__":
             mode="min",
             scheduler=scheduler,
             num_samples=config["num_trials"],
+        ),
+        run_config=RunConfig(
+            storage_path="/opt/ml/output/data"  # Use SageMaker's shared output directory
         ),
         param_space=config,
     )

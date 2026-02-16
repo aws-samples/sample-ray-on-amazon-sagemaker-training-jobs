@@ -15,8 +15,8 @@ import torchvision.transforms as transforms
 from filelock import FileLock
 from torch.utils.data import random_split
 
-from ray import train, tune
-from ray.train import RunConfig
+from ray import tune
+from ray.tune import RunConfig
 from ray.tune.schedulers import ASHAScheduler
 
 
