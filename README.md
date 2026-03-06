@@ -22,6 +22,7 @@ This repository demonstrates how to use Ray for distributed data processing and 
 
 - AWS account with Amazon SageMaker AI access
 - Ray 2.0.0+
+- SageMaker Python SDK >=3.5.0
 
 ## Project Structure
 

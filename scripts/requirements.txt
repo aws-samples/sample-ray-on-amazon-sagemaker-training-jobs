@@ -1,1 +1,2 @@
 ray[data,train,tune,serve]==2.52.1
+sagemaker==3.5.0
