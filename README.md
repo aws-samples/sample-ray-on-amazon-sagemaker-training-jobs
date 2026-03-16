@@ -99,9 +99,11 @@ The `launcher.py` script serves as the entry point for SageMaker training jobs a
 - Executing the appropriate user script (Python `.py` or Bash `.sh`)
 - Graceful shutdown with configurable wait period
 
-#### Important Note
+#### Important Notes
 
 **The `launcher.py` script is not intended to be modified by users.** This script serves as a universal entrypoint for SageMaker training jobs and handles Ray cluster setup, coordination between nodes, and execution of your custom scripts.
+
+**Ray Autoscaler is not supported.** SageMaker training jobs use a fixed number of instances defined at job creation time. The Ray cluster size is determined by the SageMaker cluster configuration (`instance_count` or `instance_groups`), and cannot be dynamically scaled during execution. All nodes are provisioned at the start of the job and remain available until the job completes.
 
 You should:
 
