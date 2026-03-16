@@ -12,6 +12,7 @@ This repository demonstrates how to use Ray for distributed data processing and 
     - [Parameter Reference](#parameter-reference)
     - [Environment Variables Reference](#environment-variables-reference)
   - [Script definition](#script-definition)
+- [Examples](#examples)
 - [Example Usage](#example-usage)
 - [Ray Dashboard](#ray-dashboard)
 - [Observability with Prometheus and Grafana](#observability-with-prometheus-and-grafana)
@@ -29,9 +30,59 @@ This repository demonstrates how to use Ray for distributed data processing and 
 ```
 ray-sagemaker-training/
 ├── scripts/
-|    ├── launcher.py
-|    └── requirements.txt
-├── examples
+│    └── launcher.py
+├── examples/
+│    ├── ray-remote/
+│    │    ├── pytorch/                    # Homogeneous cluster
+│    │    │    ├── notebook.ipynb
+│    │    │    └── scripts/
+│    │    │         ├── train.py
+│    │    │         ├── model.py
+│    │    │         └── requirements.txt
+│    │    └── pytorch-heterogeneous/      # Heterogeneous cluster
+│    │         ├── notebook.ipynb
+│    │         └── scripts/
+│    │              ├── train.py
+│    │              ├── model.py
+│    │              └── requirements.txt
+│    ├── ray-data/
+│    │    ├── pytorch/
+│    │    │    ├── notebook.ipynb
+│    │    │    └── scripts/
+│    │    │         ├── inference.py
+│    │    │         ├── model.py
+│    │    │         └── requirements.txt
+│    │    └── pytorch-heterogeneous/
+│    │         ├── notebook.ipynb
+│    │         └── scripts/
+│    │              ├── inference.py
+│    │              ├── model.py
+│    │              └── requirements.txt
+│    ├── ray-tune/
+│    │    ├── pytorch/
+│    │    │    ├── notebook.ipynb
+│    │    │    └── scripts/
+│    │    │         ├── tune.py
+│    │    │         ├── model.py
+│    │    │         └── requirements.txt
+│    │    └── pytorch-heterogeneous/
+│    │         ├── notebook.ipynb
+│    │         └── scripts/
+│    │              ├── tune.py
+│    │              ├── model.py
+│    │              └── requirements.txt
+│    └── ray-torchtrainer/
+│         ├── huggingface/
+│         │    ├── notebook.ipynb
+│         │    └── scripts/
+│         │         ├── train_ray.py
+│         │         └── requirements.txt
+│         └── huggingface-heterogeneous/
+│              ├── notebook.ipynb
+│              └── scripts/
+│                   ├── train_ray.py
+│                   └── requirements.txt
+└── images/
 ```
 
 ## Key Components
@@ -41,19 +92,23 @@ ray-sagemaker-training/
 The `launcher.py` script serves as the entry point for SageMaker training jobs and handles:
 
 - Setting up the Ray environment for both single-node and multi-node scenarios
+- Supporting both homogeneous and heterogeneous instance group clusters
 - Coordinating between head and worker nodes in a distributed setup
-- Executing the appropriate script
+- Configuring EFA/RDMA networking for supported GPU instances
+- Optionally launching Prometheus for metrics collection
+- Executing the appropriate user script (Python `.py` or Bash `.sh`)
+- Graceful shutdown with configurable wait period
 
-#### ⚠️ Important Note
+#### Important Note
 
 **The `launcher.py` script is not intended to be modified by users.** This script serves as a universal entrypoint for SageMaker training jobs and handles Ray cluster setup, coordination between nodes, and execution of your custom scripts.
 
 You should:
 
 - Write your own Ray scripts for data processing or model training
-- Use `launcher.py` as the entrypoint in their SageMaker jobs
+- Use `launcher.py` as the entrypoint in your SageMaker jobs
 - Make sure your `requirements.txt` or your container includes `ray[data,train,tune,serve]` and `sagemaker`
-- Specify the custom script path using the `--entrypoint` argument
+- Specify the custom script path using the `-e` / `--entrypoint` argument
 
 ### Required Parameters and Environment Variables
 
@@ -63,7 +118,7 @@ The `launcher.py` script requires specific parameters to execute your custom tra
 
 | Argument                | Type   | Required | Default          | Description                                                              |
 | ----------------------- | ------ | -------- | ---------------- | ------------------------------------------------------------------------ |
-| `--entrypoint`          | string | Yes      | None             | Path to your script (e.g., `training/train.py`)                          |
+| `-e`, `--entrypoint`    | string | Yes      | None             | Path to your script (e.g., `train.py`, `training/train.py`, `run.sh`)    |
 | `--head-instance-group` | string | Yes\*    | None             | Instance group name for Ray head node (heterogeneous clusters only)      |
 | `--head-num-cpus`       | int    | No       | Instance default | Number of CPUs reserved for head node                                    |
 | `--head-num-gpus`       | int    | No       | Instance default | Number of GPUs reserved for head node                                    |
@@ -76,6 +131,8 @@ The `launcher.py` script requires specific parameters to execute your custom tra
 
 ### Environment Variables Reference
 
+All parameters above can also be set as environment variables via the `environment` dict in your ModelTrainer or Estimator configuration. Environment variables are used as fallback when the corresponding command line argument is not provided.
+
 | Variable              | Type   | Required | Description                                                                                 |
 | --------------------- | ------ | -------- | ------------------------------------------------------------------------------------------- |
 | `head_instance_group` | string | No       | Alternative way to set head instance group name (heterogeneous clusters only)               |
@@ -87,23 +144,36 @@ The `launcher.py` script requires specific parameters to execute your custom tra
 
 ### Script definition
 
-The Python file to execute must contain the block
+The entry script can be a Python (`.py`) or Bash (`.sh`) file.
 
-```python
-if __name__ == "__main__":
-    code
-```
-
-Example:
+Python entry scripts must contain a `__main__` block:
 
 ```python
 import ray
 
-<YOUR_RAY_CODE>
+# Your Ray code here
 
 if __name__ == "__main__":
+    # This block will be executed by the launcher
     pass
 ```
+
+Bash entry scripts are executed directly via `bash <script_path>`.
+
+## Examples
+
+The repository includes 8 example notebooks covering 4 Ray patterns, each with both homogeneous and heterogeneous cluster configurations.
+
+Each notebook copies `launcher.py` into its local `scripts/` directory and launches a SageMaker training job using the PySDK v3 `ModelTrainer` API.
+
+| Pattern              | Description                                                                                                                              | Homogeneous         | Heterogeneous                                           |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------- | ------------------------------------------------------- |
+| **ray-remote**       | Distributed task-level parallelism using `@ray.remote` for data cleaning and PyTorch model training (sentiment classification)           | 1x `ml.m5.2xlarge`  | 1x `ml.t3.large` (head) + 2x `ml.m5.2xlarge` (workers)  |
+| **ray-data**         | Batch inference with `ray.data` using ResNet152 on Imagenette dataset                                                                    | 1x `ml.m5.2xlarge`  | 1x `ml.t3.large` (head) + 2x `ml.m5.2xlarge` (workers)  |
+| **ray-tune**         | Hyperparameter tuning with `ray.tune` and ASHA scheduler on CIFAR-10                                                                     | 1x `ml.m5.2xlarge`  | 1x `ml.t3.large` (head) + 2x `ml.m5.2xlarge` (workers)  |
+| **ray-torchtrainer** | Distributed LLM fine-tuning (LoRA/QLoRA) with `ray.train.torch.TorchTrainer`, HuggingFace Transformers, and optional MLflow/W&B tracking | 1x `ml.g5.12xlarge` | 1x `ml.t3.2xlarge` (head) + 4x `ml.g5.xlarge` (workers) |
+
+In heterogeneous configurations, the head node is configured as coordinator-only (`head_num_cpus=0`, `head_num_gpus=0`), while the worker instance group handles computation.
 
 ## Example Usage
 
@@ -113,7 +183,7 @@ The launcher script has been designed to be flexible and dynamic, allowing you t
 
 The launcher uses one argument:
 
-- `--entrypoint`: Path to the script to execute (must contain `if __name__ == "__main__":` block)
+- `-e` / `--entrypoint`: Path to the script to execute (Python files must contain `if __name__ == "__main__":` block)
 
 ### Usage Examples
 
@@ -122,21 +192,22 @@ See the content of [examples](./examples)
 #### 1. Using SageMaker ModelTrainer (Recommended)
 
 ```python
-from sagemaker.modules.configs import (
+from sagemaker.train.configs import (
     Compute,
     OutputDataConfig,
     SourceCode,
     StoppingCondition,
-    InputData,
 )
-from sagemaker.modules.train import ModelTrainer
+from sagemaker.train.model_trainer import ModelTrainer
 
 args = [
+    "-e",
+    "train.py",
     "--epochs",
     "25",
     "--learning_rate",
     "0.001",
-    "batch_size",
+    "--batch_size",
     "100",
 ]
 
@@ -144,12 +215,12 @@ args = [
 source_code = SourceCode(
     source_dir="./scripts",
     requirements="requirements.txt",
-    command=f"python launcher.py -e training/train.py {' '.join(args)}",
+    command=f"python launcher.py {' '.join(args)}",
 )
 
 # Define compute configuration
 compute_configs = Compute(
-    instance_type="ml.g4dn.xlarge",
+    instance_type="ml.m5.2xlarge",
     instance_count=1,
     keep_alive_period_in_seconds=0,
 )
@@ -166,161 +237,99 @@ model_trainer = ModelTrainer(
     compute=compute_configs,
     stopping_condition=StoppingCondition(max_runtime_in_seconds=18000),
     output_data_config=OutputDataConfig(s3_output_path=output_path),
+    role=role,
 )
 
 ...
 
 # Start the training job
-model_trainer.train(input_data_config=[train_input, test_input], wait=False)
+model_trainer.train(input_data_config=[train_input], wait=False)
 ```
 
-#### 2. Using SageMaker ModelTrainer (with environment variables)
+#### 2. Heterogeneous Cluster with SageMaker ModelTrainer
 
 ```python
-from sagemaker.modules.configs import (
+from sagemaker.train.configs import (
     Compute,
+    InstanceGroup,
     OutputDataConfig,
+    RemoteDebugConfig,
     SourceCode,
     StoppingCondition,
-    InputData,
 )
-from sagemaker.modules.train import ModelTrainer
-
-# Define the source code configuration
-source_code = SourceCode(
-    source_dir="./scripts",
-    requirements="requirements.txt",
-    entry_script="launcher.py",
-)
-
-# Define compute configuration
-compute_configs = Compute(
-    instance_type="ml.g4dn.xlarge",
-    instance_count=1,
-    keep_alive_period_in_seconds=0,
-)
-
-# Define training job name and output path
-job_name = "train-ray-training"
-output_path = f"s3://{bucket_name}/{job_name}"
-
-# Create the ModelTrainer
-model_trainer = ModelTrainer(
-    training_image=image_uri,
-    source_code=source_code,
-    base_job_name=job_name,
-    compute=compute_configs,
-    hyperparameters={
-        "entrypoint": "training/train.py",          # Look in training/ subdirectory containing your entry script, under SourceCode `source_dir`
-        "epochs": 25,
-        "learning_rate": 0.001,
-        "batch_size": 100,
-    },
-    stopping_condition=StoppingCondition(max_runtime_in_seconds=18000),
-    output_data_config=OutputDataConfig(s3_output_path=output_path),
-)
-
-...
-
-# Start the training job
-model_trainer.train(input_data_config=[train_input, test_input], wait=False)
-```
-
-#### 3. Using PyTorch Estimator
-
-```python
-from sagemaker.pytorch import PyTorch
-
-# Configure your training job
-estimator = PyTorch(
-    entry_point="launcher.py",
-    source_dir="scripts",
-    role=role,
-    instance_type="ml.g4dn.xlarge",
-    instance_count=1,
-    framework_version="2.6.0",
-    py_version="py312",
-    hyperparameters={
-        "entrypoint": "training/train.py", # Define the entrypoint HERE
-        "epochs": 25,
-        "learning_rate": 0.001,
-        "batch_size": 100,
-    }
-)
-
-estimator.fit({"training": training_data_path})
-```
-
-#### 4. Heterogeneous Cluster training with PyTorch Estimator
-
-For heterogeneous clusters with different instance types, you can use instance groups to optimize resource allocation. This is particularly useful when you want to separate coordination (head node) from computation (worker nodes).
-
-```python
-from sagemaker.pytorch import PyTorch
-from sagemaker.instance_group import InstanceGroup
-from sagemaker.inputs import TrainingInput
+from sagemaker.train.model_trainer import ModelTrainer
 
 # Define instance groups with different instance types
 instance_groups = [
     InstanceGroup(
         instance_group_name="head-instance-group",
-        instance_type="ml.t3.xlarge",  # CPU-only for coordination
-        instance_count=1
+        instance_type="ml.t3.large",       # CPU-only for coordination
+        instance_count=1,
     ),
     InstanceGroup(
-        instance_group_name="worker-instance-group",
-        instance_type="ml.g5.xlarge",  # GPU instances for training
-        instance_count=2
-    )
+        instance_group_name="worker-instance-group-1",
+        instance_type="ml.m5.2xlarge",     # Compute instances for training
+        instance_count=2,
+    ),
 ]
 
-# Configure the estimator for heterogeneous training
-estimator = PyTorch(
+args = [
+    "--entrypoint",
+    "train.py",
+    "--epochs",
+    "100",
+    "--learning_rate",
+    "0.001",
+    "--batch_size",
+    "100",
+]
+
+# Define the source code configuration
+source_code = SourceCode(
     source_dir="./scripts",
-    entry_point="launcher.py",
-    output_path=output_path,
+    requirements="requirements.txt",
+    command=f"python launcher.py {' '.join(args)}",
+)
+
+# Define compute with instance groups
+compute_configs = Compute(
+    instance_groups=instance_groups,
+    keep_alive_period_in_seconds=0,
+)
+
+# Define training job name and output path
+job_name = "train-ray-training"
+output_path = f"s3://{bucket_name}/{job_name}"
+
+# Create the ModelTrainer
+model_trainer = ModelTrainer(
+    training_image=image_uri,
+    source_code=source_code,
     base_job_name=job_name,
-    role=role,
-    instance_groups=instance_groups,  # Use instance groups instead of instance_type/count
-    max_run=432000,
-    image_uri=image_uri,
+    compute=compute_configs,
+    stopping_condition=StoppingCondition(max_runtime_in_seconds=18000),
+    output_data_config=OutputDataConfig(
+        s3_output_path=output_path, compression_type="NONE"
+    ),
     environment={
         "head_instance_group": "head-instance-group",  # Specify which group is the head
-        "head_num_cpus": "0",  # Head node as coordinator only (0 CPUs for computation)
-        "head_num_gpus": "0",  # Head node as coordinator only (0 GPUs for computation)
+        "head_num_cpus": "0",   # Head node as coordinator only
+        "head_num_gpus": "0",   # Head node as coordinator only
     },
-    hyperparameters={
-        "entrypoint": "training/train.py",
-        "epochs": 25,
-        "learning_rate": 0.001,
-        "batch_size": 100,
-    },
-)
+    role=role,
+).with_remote_debug_config(RemoteDebugConfig(enable_remote_debug=True))
 
-# Configure data inputs for heterogeneous clusters
-train_input = TrainingInput(
-    s3_data_type='S3Prefix',
-    s3_data=train_dataset_s3_path,
-    distribution='FullyReplicated',
-    instance_groups=["head-instance-group", "worker-instance-group"],  # Data available to both groups
-)
+...
 
-test_input = TrainingInput(
-    s3_data_type='S3Prefix',
-    s3_data=test_dataset_s3_path,
-    distribution='FullyReplicated',
-    instance_groups=["head-instance-group", "worker-instance-group"],  # Data available to both groups
-)
-
-# Start training
-estimator.fit({"train": train_input, "test": test_input})
+# Start the training job
+model_trainer.train(input_data_config=[train_input], wait=False)
 ```
 
-**Key Environment variables for Heterogeneous Clusters:**
+**Key environment variables for heterogeneous clusters:**
 
-- `--head_instance_group`: Specifies which instance group should act as the Ray head node
-- `--head_num_cpus`: Number of CPUs to reserve for the head node (set to 0 for coordinator-only mode)
-- `--head_num_gpus`: Number of GPUs to reserve for the head node (set to 0 for coordinator-only mode)
+- `head_instance_group`: Specifies which instance group should act as the Ray head node
+- `head_num_cpus`: Number of CPUs to reserve for the head node (set to `"0"` for coordinator-only mode)
+- `head_num_gpus`: Number of GPUs to reserve for the head node (set to `"0"` for coordinator-only mode)
 
 ### Entry Script Requirements
 
@@ -328,13 +337,14 @@ Your entry scripts must follow this pattern:
 
 ```python
 # my_script.py
-...
-<MY CODE HERE>
-...
+import ray
+
+# Your Ray code here
 
 if __name__ == "__main__":
     # This block will be executed by the launcher
-    <MY CODE HERE>
+    # Ray is already initialized — use ray.cluster_resources(), @ray.remote, etc.
+    pass
 ```
 
 ## Ray Dashboard
@@ -349,10 +359,8 @@ Please refer to the official [AWS Documentation](https://docs.aws.amazon.com/sag
 
 Enable remote debugging for SageMaker training jobs:
 
-#### Option 1: ModelTrainer class
-
 ```python
-from sagemaker.modules.configs import (
+from sagemaker.train.configs import (
     CheckpointConfig,
     Compute,
     OutputDataConfig,
@@ -360,13 +368,13 @@ from sagemaker.modules.configs import (
     SourceCode,
     StoppingCondition,
 )
-from sagemaker.modules.train import ModelTrainer
+from sagemaker.train.model_trainer import ModelTrainer
 
 # Define the script to be run
 source_code = SourceCode(
     source_dir="./scripts",
     requirements="requirements.txt",
-    command="python launcher.py --entrypoint training/train_ray.py",
+    command="python launcher.py --entrypoint train_ray.py",
 )
 
 # Define the compute
@@ -385,48 +393,12 @@ model_trainer = ModelTrainer(
     base_job_name=job_name,
     compute=compute_configs,
     stopping_condition=StoppingCondition(max_runtime_in_seconds=18000),
-    hyperparameters={
-        "config": "/opt/ml/input/data/config/args.yaml"  # path to TRL config which was uploaded to s3
-    },
     output_data_config=OutputDataConfig(s3_output_path=output_path),
     checkpoint_config=CheckpointConfig(
         s3_uri=output_path + "/checkpoint", local_path="/opt/ml/checkpoints"
     ),
     role=role,
 ).with_remote_debug_config(RemoteDebugConfig(enable_remote_debug=True))
-```
-
-#### Option 2: PyTorch Estimator
-
-```python
-from sagemaker.pytorch import PyTorch
-
-# define training job Name
-job_name = "inference-resnet-ray"
-
-# define OutputDataConfig path
-if default_prefix:
-    output_path = f"s3://{bucket_name}/{default_prefix}/{job_name}"
-else:
-    output_path = f"s3://{bucket_name}/{job_name}"
-
-estimator = PyTorch(
-    source_dir="./scripts",
-    entry_point="launcher.py",
-    output_path=output_path,
-    base_job_name=job_name,
-    role=role,
-    instance_type=instance_type,
-    instance_count=instance_count,
-    encrypt_inter_container_traffic=False,
-    enable_network_isolation=False,
-    max_run=432000,
-    image_uri=image_uri,
-    hyperparameters={
-        "entrypoint": "train.py",
-    },
-    enable_remote_debug=True,
-)
 ```
 
 ### Step 3:
@@ -437,7 +409,7 @@ Access the training container, by starting a Port Forwarding to the port `8265` 
 aws ssm start-session --target sagemaker-training-job:<training-job-name>_algo-<n> \
 --region <aws_region> \
 --document-name AWS-StartPortForwardingSession \
---parameters '{"portNumber":["8265"],"localPortNumber":["8265"]}’
+--parameters '{"portNumber":["8265"],"localPortNumber":["8265"]}'
 ```
 
 In a multi-node cluster, you can check the head node by investigating the CloudWatch logs:
@@ -461,7 +433,7 @@ To allow system metrics collection through Prometheus and Grafana on the SageMak
 
 With this approach, both Prometheus and Grafana server should be deployed on an external system.
 
-⚠️ Internet connectivity is the SageMaker cluster required
+> **Note:** Internet connectivity on the SageMaker cluster is required
 
 #### Step 1: Setup IAM Permissions:
 
@@ -471,10 +443,8 @@ Please refer to the official [AWS Documentation](https://docs.aws.amazon.com/sag
 
 Enable remote debugging for SageMaker training jobs:
 
-##### Option 1: ModelTrainer class
-
 ```python
-from sagemaker.modules.configs import (
+from sagemaker.train.configs import (
     CheckpointConfig,
     Compute,
     OutputDataConfig,
@@ -482,7 +452,7 @@ from sagemaker.modules.configs import (
     SourceCode,
     StoppingCondition,
 )
-from sagemaker.modules.train import ModelTrainer
+from sagemaker.train.model_trainer import ModelTrainer
 
 # Define the script to be run
 source_code = SourceCode(
@@ -508,12 +478,9 @@ model_trainer = ModelTrainer(
     compute=compute_configs,
     stopping_condition=StoppingCondition(max_runtime_in_seconds=18000),
     environment={
-        "RAY_GRAFANA_HOST": "<GRAFANA_HOST>", # If you need Observability
+        "RAY_GRAFANA_HOST": "<GRAFANA_HOST>",
         "RAY_PROMETHEUS_HOST": "<PROMETHEUS_HOST>",
         "RAY_PROMETHEUS_NAME": "prometheus",
-    },
-    hyperparameters={
-        "config": "/opt/ml/input/data/config/args.yaml"  # path to TRL config which was uploaded to s3
     },
     output_data_config=OutputDataConfig(s3_output_path=output_path),
     checkpoint_config=CheckpointConfig(
@@ -521,44 +488,6 @@ model_trainer = ModelTrainer(
     ),
     role=role,
 ).with_remote_debug_config(RemoteDebugConfig(enable_remote_debug=True))
-```
-
-##### Option 2: PyTorch Estimator
-
-```python
-from sagemaker.pytorch import PyTorch
-
-# define training job Name
-job_name = "inference-resnet-ray"
-
-# define OutputDataConfig path
-if default_prefix:
-    output_path = f"s3://{bucket_name}/{default_prefix}/{job_name}"
-else:
-    output_path = f"s3://{bucket_name}/{job_name}"
-
-estimator = PyTorch(
-    source_dir="./scripts",
-    entry_point="launcher.py",
-    output_path=output_path,
-    base_job_name=job_name,
-    role=role,
-    instance_type=instance_type,
-    instance_count=instance_count,
-    encrypt_inter_container_traffic=False,
-    enable_network_isolation=False,
-    max_run=432000,
-    image_uri=image_uri,
-    environment={
-        "RAY_GRAFANA_HOST": "<GRAFANA_HOST>",
-        "RAY_PROMETHEUS_HOST": "<PROMETHEUS_HOST>",
-        "RAY_PROMETHEUS_NAME": "prometheus",
-    },
-    hyperparameters={
-        "entrypoint": "train.py",
-    },
-    enable_remote_debug=True,
-)
 ```
 
 #### Step 3 - Port Forwarding to the Prometheus port in the Grafana server environment:
@@ -569,7 +498,7 @@ To make sure your Grafana server will collect the captured metrics by Prometheus
 aws ssm start-session --target sagemaker-training-job:<training-job-name>_algo-<n> \
 --region <aws_region> \
 --document-name AWS-StartPortForwardingSession \
---parameters '{"portNumber":["8080"],"localPortNumber":["<YOUR_LOCAL_PORT>"]}’
+--parameters '{"portNumber":["8080"],"localPortNumber":["<YOUR_LOCAL_PORT>"]}'
 ```
 
 In a multi-node cluster, you can check the head node by investigating the CloudWatch logs:
@@ -601,7 +530,7 @@ Access the training container, by starting a Port Forwarding to the port `8265` 
 aws ssm start-session --target sagemaker-training-job:<training-job-name>_algo-<n> \
 --region <aws_region> \
 --document-name AWS-StartPortForwardingSession \
---parameters '{"portNumber":["8265"],"localPortNumber":["8265"]}’
+--parameters '{"portNumber":["8265"],"localPortNumber":["8265"]}'
 ```
 
 In a multi-node cluster, you can check the head node by investigating the CloudWatch logs:
@@ -621,7 +550,7 @@ Access the Ray Dashboard from your browser: `localhost:8265`:
 
 Ray provides the capability to run local prometheus to collect system metrics during the execution of the workload. With this approach, a Grafana server deployed on an external system is required to get access to the metric visualizations.
 
-⚠️ Internet connectivity is the SageMaker cluster required
+> **Note:** Internet connectivity on the SageMaker cluster is required
 
 #### Step 1: Setup IAM Permissions:
 
@@ -631,10 +560,8 @@ Please refer to the official [AWS Documentation](https://docs.aws.amazon.com/sag
 
 Enable remote debugging for SageMaker training jobs:
 
-##### Option 1: ModelTrainer class
-
 ```python
-from sagemaker.modules.configs import (
+from sagemaker.train.configs import (
     CheckpointConfig,
     Compute,
     OutputDataConfig,
@@ -642,7 +569,7 @@ from sagemaker.modules.configs import (
     SourceCode,
     StoppingCondition,
 )
-from sagemaker.modules.train import ModelTrainer
+from sagemaker.train.model_trainer import ModelTrainer
 
 # Define the script to be run
 source_code = SourceCode(
@@ -671,52 +598,12 @@ model_trainer = ModelTrainer(
         "launch_prometheus": "true",
         "RAY_GRAFANA_HOST": "<GRAFANA_HOST>",
     },
-    hyperparameters={
-        "config": "/opt/ml/input/data/config/args.yaml"  # path to TRL config which was uploaded to s3
-    },
     output_data_config=OutputDataConfig(s3_output_path=output_path),
     checkpoint_config=CheckpointConfig(
         s3_uri=output_path + "/checkpoint", local_path="/opt/ml/checkpoints"
     ),
     role=role,
 ).with_remote_debug_config(RemoteDebugConfig(enable_remote_debug=True))
-```
-
-##### Option 2: PyTorch Estimator
-
-```python
-from sagemaker.pytorch import PyTorch
-
-# define training job name:
-job_name = "inference-resnet-ray"
-
-# define OutputDataConfig path
-if default_prefix:
-    output_path = f"s3://{bucket_name}/{default_prefix}/{job_name}"
-else:
-    output_path = f"s3://{bucket_name}/{job_name}"
-
-estimator = PyTorch(
-    source_dir="./scripts",
-    entry_point="launcher.py",
-    output_path=output_path,
-    base_job_name=job_name,
-    role=role,
-    instance_type=instance_type,
-    instance_count=instance_count,
-    encrypt_inter_container_traffic=False,
-    enable_network_isolation=False,
-    max_run=432000,
-    image_uri=image_uri,
-    environment={
-        "launch_prometheus": "true",
-        "RAY_GRAFANA_HOST": "<GRAFANA_HOST>",
-    },
-    hyperparameters={
-        "entrypoint": "train.py",
-    },
-    enable_remote_debug=True,
-)
 ```
 
 #### Step 3 - Port Forwarding to the Prometheus port in the Grafana server environment:
@@ -727,7 +614,7 @@ To make sure your Grafana server will collect the captured metrics by Prometheus
 aws ssm start-session --target sagemaker-training-job:<training-job-name>_algo-<n> \
 --region <aws_region> \
 --document-name AWS-StartPortForwardingSession \
---parameters '{"portNumber":["9090"],"localPortNumber":["9090"]}’
+--parameters '{"portNumber":["9090"],"localPortNumber":["9090"]}'
 ```
 
 In a multi-node cluster, you can check the head node by investigating the CloudWatch logs:
@@ -745,7 +632,7 @@ Access the training container, by starting a Port Forwarding to the port `8265` 
 aws ssm start-session --target sagemaker-training-job:<training-job-name>_algo-<n> \
 --region <aws_region> \
 --document-name AWS-StartPortForwardingSession \
---parameters '{"portNumber":["8265"],"localPortNumber":["8265"]}’
+--parameters '{"portNumber":["8265"],"localPortNumber":["8265"]}'
 ```
 
 In a multi-node cluster, you can check the head node by investigating the CloudWatch logs:
@@ -779,9 +666,9 @@ Upload the downloaded binary to your S3 bucket:
 
 ```python
 import boto3
-import sagemaker
+from sagemaker.core.helper.session_helper import Session
 
-sagemaker_session = sagemaker.Session()
+sagemaker_session = Session()
 s3_client = boto3.client('s3')
 
 bucket_name = sagemaker_session.default_bucket()
@@ -810,46 +697,51 @@ print(f"Prometheus binary uploaded to: {prometheus_s3_path}")
 Add the Prometheus binary as a training input channel:
 
 ```python
-from sagemaker.inputs import TrainingInput
+from sagemaker.train.configs import InputData, S3DataSource
 
-prometheus_input = TrainingInput(
-    s3_data_type="S3Prefix",
-    s3_data=prometheus_s3_path,
-    distribution="FullyReplicated",
-    instance_groups=["head-instance-group", "worker-instance-group"],  # For heterogeneous clusters
+prometheus_input = InputData(
+    channel_name="prometheus",
+    data_source=S3DataSource(
+        s3_data_type="S3Prefix",
+        s3_uri=prometheus_s3_path,
+        s3_data_distribution_type="FullyReplicated",
+    ),
 )
 
 # Add to your training data inputs
-data = {
-    "train": train_input,
-    "test": test_input,
-    "config": config_input,
-    "prometheus": prometheus_input,  # Add prometheus input
-}
+data = [
+    train_input,
+    config_input,
+    prometheus_input,
+]
 ```
 
-###### Step 4: Configure Environment Variables and Hyperparameters
+###### Step 4: Configure the launcher to use the provided binary
 
-Configure your estimator to use the provided Prometheus binary with the required environment variables:
+Pass the `--prometheus-path` argument pointing to where SageMaker mounts the input channel:
 
 ```python
-estimator = PyTorch(
+args = [
+    "--entrypoint",
+    "train_ray.py",
+    "--prometheus-path",
+    "/opt/ml/input/data/prometheus/prometheus-3.4.2.linux-amd64.tar.gz",
+]
+
+source_code = SourceCode(
     source_dir="./scripts",
-    entry_point="launcher.py",
-    # ... other configuration ...
+    requirements="requirements.txt",
+    command=f"python launcher.py {' '.join(args)}",
+)
+
+model_trainer = ModelTrainer(
+    ...
+    source_code=source_code,
     environment={
-        "head_instance_group": "head-instance-group",
-        "head_num_cpus": "0",
-        "head_num_gpus": "0",
-        "launch_prometheus": "true",  # Enable Prometheus launch
-        "RAY_GRAFANA_HOST": "<GRAFANA_HOST>",  # Replace with your Grafana host
+        "launch_prometheus": "true",
+        "RAY_GRAFANA_HOST": "<GRAFANA_HOST>",
     },
-    hyperparameters={
-        "entrypoint": "train_ray.py",
-        "config": "/opt/ml/input/data/config/args.yaml",
-        "prometheus-path": "/opt/ml/input/data/prometheus/prometheus-3.4.2.linux-amd64.tar.gz",  # Path to prometheus binary
-    },
-    # ... rest of configuration ...
+    ...
 )
 ```
 

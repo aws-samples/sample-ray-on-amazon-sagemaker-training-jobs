@@ -162,4 +162,5 @@ examples/**/launcher.py
 */**/cdk.*/
 */**/configs_*
 args.yaml
-*/**/*.tar.gz
+*/**/*.tar.
+.claude
