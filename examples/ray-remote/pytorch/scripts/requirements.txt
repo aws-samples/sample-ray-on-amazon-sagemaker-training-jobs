@@ -1,5 +1,5 @@
 boto3
 emoji
-ray[data,train,tune,serve]==2.52.1
+ray[data,train,tune,serve]==2.54.0
 sagemaker==3.4.1
 scikit-learn==1.7.0
