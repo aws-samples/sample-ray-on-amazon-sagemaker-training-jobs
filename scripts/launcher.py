@@ -422,7 +422,7 @@ def _build_prometheus_command(prometheus_folder_name: str) -> str:
     Returns:
         Safely constructed prometheus command string
     """
-    prometheus_binary_path = f"./{prometheus_folder_name}/prometheus"
+    prometheus_binary_path = f"/opt/ml/code/{prometheus_folder_name}/prometheus"
     config_file_path = "/tmp/ray/session_latest/metrics/prometheus/prometheus.yml"
     return f"{shlex.quote(prometheus_binary_path)} --config.file={shlex.quote(config_file_path)}"
 
@@ -864,7 +864,11 @@ def _validate_command(args: List[str]) -> None:
         raise ValueError("Empty command not allowed")
 
     executable = args[0]
-    if executable in ["ray", "bash"] or executable.startswith("./prometheus-"):
+    if (
+        executable in ["ray", "bash"]
+        or executable.startswith("./prometheus-")
+        or executable.startswith("/opt/ml/code/prometheus-")
+    ):
         return
 
     raise ValueError(f"Command not allowed: {executable}")
