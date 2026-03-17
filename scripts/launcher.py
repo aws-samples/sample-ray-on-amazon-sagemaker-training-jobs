@@ -1199,7 +1199,7 @@ def _setup_head_node(
             while time.time() - start_time < PROMETHEUS_WAIT_SECONDS:
                 try:
                     response = requests.get(
-                        f"{ray_init_kwargs['runtime_env']['RAY_PROMETHEUS_HOST']}/-/healthy",
+                        f"{runtime_env['RAY_PROMETHEUS_HOST']}/-/healthy",
                         timeout=5,
                     )
                     if response.status_code == 200:
@@ -1468,7 +1468,7 @@ def _setup_single_node_ray(
             while time.time() - start_time < PROMETHEUS_WAIT_SECONDS:
                 try:
                     response = requests.get(
-                        f"{ray_init_kwargs['runtime_env']['RAY_PROMETHEUS_HOST']}/-/healthy",
+                        f"{runtime_env['RAY_PROMETHEUS_HOST']}/-/healthy",
                         timeout=5,
                     )
                     if response.status_code == 200:
