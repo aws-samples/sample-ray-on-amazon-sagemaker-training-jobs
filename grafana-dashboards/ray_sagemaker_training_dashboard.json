@@ -3,7 +3,10 @@
     "list": [
       {
         "builtIn": 1,
-        "datasource": "-- Grafana --",
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
         "enable": true,
         "hide": true,
         "iconColor": "rgba(0, 211, 255, 1)",
@@ -12,13 +15,16 @@
       }
     ]
   },
+  "description": "Combined Ray cluster and training metrics for SageMaker training jobs. Select a SessionName to filter by training job.",
   "editable": true,
-  "gnetId": null,
+  "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "iteration": 1667344411089,
+  "id": null,
   "links": [],
   "panels": [
     {
+      "type": "row",
+      "title": "Cluster Overview",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -26,9 +32,7 @@
         "x": 0,
         "y": 0
       },
-      "id": 1001,
-      "title": "Overview and Health",
-      "type": "row",
+      "id": 1,
       "panels": []
     },
     {
@@ -43,15 +47,15 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
+        "h": 6,
+        "w": 8,
         "x": 0,
         "y": 1
       },
       "fill": 10,
       "fillGradient": 0,
       "hiddenSeries": false,
-      "id": 24,
+      "id": 2,
       "legend": {
         "alignAsTable": true,
         "avg": true,
@@ -107,7 +111,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "sum(autoscaler_active_nodes{SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (NodeType)",
+          "expr": "sum(autoscaler_active_nodes{SessionName=~\"$SessionName\"}) by (NodeType)",
           "interval": "",
           "legendFormat": "Active Nodes: {{NodeType}}",
           "queryType": "randomWalk",
@@ -115,7 +119,7 @@
         },
         {
           "exemplar": true,
-          "expr": "sum(autoscaler_recently_failed_nodes{SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (NodeType)",
+          "expr": "sum(autoscaler_recently_failed_nodes{SessionName=~\"$SessionName\"}) by (NodeType)",
           "interval": "",
           "legendFormat": "Failed Nodes: {{NodeType}}",
           "queryType": "randomWalk",
@@ -123,7 +127,7 @@
         },
         {
           "exemplar": true,
-          "expr": "sum(autoscaler_pending_nodes{SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (NodeType)",
+          "expr": "sum(autoscaler_pending_nodes{SessionName=~\"$SessionName\"}) by (NodeType)",
           "interval": "",
           "legendFormat": "Pending Nodes: {{NodeType}}",
           "queryType": "randomWalk",
@@ -185,15 +189,15 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
+        "h": 6,
+        "w": 16,
+        "x": 8,
         "y": 1
       },
       "fill": 0,
       "fillGradient": 0,
       "hiddenSeries": false,
-      "id": 41,
+      "id": 3,
       "legend": {
         "alignAsTable": true,
         "avg": true,
@@ -249,7 +253,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "avg(ray_node_cpu_utilization{instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"})",
+          "expr": "avg(ray_node_cpu_utilization{instance=~\"$Instance\",SessionName=~\"$SessionName\"})",
           "interval": "",
           "legendFormat": "CPU (physical)",
           "queryType": "randomWalk",
@@ -257,7 +261,7 @@
         },
         {
           "exemplar": true,
-          "expr": "sum(ray_node_gpus_utilization{instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) / on() (sum(ray_node_gpus_available{instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) or vector(0))",
+          "expr": "sum(ray_node_gpus_utilization{instance=~\"$Instance\",SessionName=~\"$SessionName\"}) / on() (sum(ray_node_gpus_available{instance=~\"$Instance\",SessionName=~\"$SessionName\"}) or vector(0))",
           "interval": "",
           "legendFormat": "GPU (physical)",
           "queryType": "randomWalk",
@@ -265,7 +269,7 @@
         },
         {
           "exemplar": true,
-          "expr": "sum(ray_node_mem_used{instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) / on() (sum(ray_node_mem_total{instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"})) * 100",
+          "expr": "sum(ray_node_mem_used{instance=~\"$Instance\",SessionName=~\"$SessionName\"}) / on() (sum(ray_node_mem_total{instance=~\"$Instance\",SessionName=~\"$SessionName\"})) * 100",
           "interval": "",
           "legendFormat": "Memory (RAM)",
           "queryType": "randomWalk",
@@ -273,7 +277,7 @@
         },
         {
           "exemplar": true,
-          "expr": "sum(ray_node_gram_used{instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) / on() (sum(ray_node_gram_available{instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) + sum(ray_node_gram_used{instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"})) * 100",
+          "expr": "sum(ray_node_gram_used{instance=~\"$Instance\",SessionName=~\"$SessionName\"}) / on() (sum(ray_node_gram_available{instance=~\"$Instance\",SessionName=~\"$SessionName\"}) + sum(ray_node_gram_used{instance=~\"$Instance\",SessionName=~\"$SessionName\"})) * 100",
           "interval": "",
           "legendFormat": "GRAM",
           "queryType": "randomWalk",
@@ -281,7 +285,7 @@
         },
         {
           "exemplar": true,
-          "expr": "sum(ray_object_store_memory{instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) / on() sum(ray_resources{Name=\"object_store_memory\",instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) * 100",
+          "expr": "sum(ray_object_store_memory{instance=~\"$Instance\",SessionName=~\"$SessionName\"}) / on() sum(ray_resources{Name=\"object_store_memory\",instance=~\"$Instance\",SessionName=~\"$SessionName\"}) * 100",
           "interval": "",
           "legendFormat": "Object Store Memory",
           "queryType": "randomWalk",
@@ -289,7 +293,7 @@
         },
         {
           "exemplar": true,
-          "expr": "sum(ray_node_disk_usage{instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) / on() (sum(ray_node_disk_free{instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) + sum(ray_node_disk_usage{instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"})) * 100",
+          "expr": "sum(ray_node_disk_usage{instance=~\"$Instance\",SessionName=~\"$SessionName\"}) / on() (sum(ray_node_disk_free{instance=~\"$Instance\",SessionName=~\"$SessionName\"}) + sum(ray_node_disk_usage{instance=~\"$Instance\",SessionName=~\"$SessionName\"})) * 100",
           "interval": "",
           "legendFormat": "Disk",
           "queryType": "randomWalk",
@@ -340,142 +344,16 @@
       }
     },
     {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": "${datasource}",
-      "description": "The number of tasks and actors killed by the Ray Out of Memory killer due to high memory pressure. Metrics are broken down by IP and the name. https://docs.ray.io/en/master/ray-core/scheduling/ray-oom-prevention.html. Note: The RayNodeType filter does not work on this graph.",
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 9
-      },
-      "fill": 10,
-      "fillGradient": 0,
-      "hiddenSeries": false,
-      "id": 44,
-      "legend": {
-        "alignAsTable": true,
-        "avg": true,
-        "current": true,
-        "hideEmpty": false,
-        "hideZero": true,
-        "max": true,
-        "min": false,
-        "rightSide": false,
-        "show": true,
-        "sort": "current",
-        "sortDesc": true,
-        "total": false,
-        "values": true
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "connected",
-      "options": {
-        "alertThreshold": true
-      },
-      "percentage": false,
-      "pluginVersion": "7.5.17",
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [
-        {
-          "$$hashKey": "object:2987",
-          "alias": "MAX",
-          "dashes": true,
-          "color": "#1F60C4",
-          "fill": 0,
-          "stack": false
-        },
-        {
-          "$$hashKey": "object:78",
-          "alias": "/FINISHED|FAILED|DEAD|REMOVED|Failed Nodes:/",
-          "hiddenSeries": true
-        },
-        {
-          "$$hashKey": "object:2987",
-          "alias": "MAX + PENDING",
-          "dashes": true,
-          "color": "#777777",
-          "fill": 0,
-          "stack": false
-        }
-      ],
-      "spaceLength": 10,
-      "stack": true,
-      "steppedLine": false,
-      "targets": [
-        {
-          "exemplar": true,
-          "expr": "sum(ray_memory_manager_worker_eviction_total{instance=~\"$Instance\", SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (Name, instance)",
-          "interval": "",
-          "legendFormat": "OOM Killed: {{Name}}, {{instance}}",
-          "queryType": "randomWalk",
-          "refId": "A"
-        }
-      ],
-      "thresholds": [],
-      "timeFrom": null,
-      "timeRegions": [],
-      "timeShift": null,
-      "title": "Ray OOM Kills (Tasks and Actors)",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "buckets": null,
-        "mode": "time",
-        "name": null,
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "$$hashKey": "object:628",
-          "format": "failures",
-          "label": "",
-          "logBase": 1,
-          "max": null,
-          "min": "0",
-          "show": true
-        },
-        {
-          "$$hashKey": "object:629",
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false,
-        "alignLevel": null
-      }
-    },
-    {
+      "type": "row",
+      "title": "Training Metrics",
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 17
+        "y": 7
       },
-      "id": 1005,
-      "title": "Hardware Utilization by Node",
-      "type": "row",
+      "id": 4,
       "panels": []
     },
     {
@@ -484,21 +362,21 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${datasource}",
-      "description": "The physical (hardware) CPU usage for each node.",
+      "description": "Current state of the train controller.",
       "fieldConfig": {
         "defaults": {},
         "overrides": []
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
+        "w": 8,
         "x": 0,
-        "y": 18
+        "y": 8
       },
       "fill": 10,
       "fillGradient": 0,
       "hiddenSeries": false,
-      "id": 2,
+      "id": 5,
       "legend": {
         "alignAsTable": true,
         "avg": true,
@@ -554,26 +432,18 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "sum(ray_node_cpu_utilization{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"} * ray_node_cpu_count{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"} / 100) by (instance, RayNodeType)",
+          "expr": "sum(ray_train_controller_state{ray_train_run_name=~\"$TrainRunName\", ray_train_run_id=~\"$TrainRunId\", SessionName=~\"$SessionName\"}) by (ray_train_run_name, ray_train_controller_state)",
           "interval": "",
-          "legendFormat": "CPU Usage: {{instance}} ({{RayNodeType}})",
+          "legendFormat": "Run Name: {{ray_train_run_name}}, Controller State: {{ray_train_controller_state}}",
           "queryType": "randomWalk",
           "refId": "A"
-        },
-        {
-          "exemplar": true,
-          "expr": "sum(ray_node_cpu_count{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"})",
-          "interval": "",
-          "legendFormat": "MAX",
-          "queryType": "randomWalk",
-          "refId": "B"
         }
       ],
       "thresholds": [],
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Node CPU Usage",
+      "title": "Controller State",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -590,7 +460,7 @@
       "yaxes": [
         {
           "$$hashKey": "object:628",
-          "format": "cores",
+          "format": "",
           "label": "",
           "logBase": 1,
           "max": null,
@@ -618,404 +488,18 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${datasource}",
-      "description": "The percentage of physical (hardware) CPU usage for each node.",
+      "description": "Time taken by the controller for worker group operations.",
       "fieldConfig": {
         "defaults": {},
         "overrides": []
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 18
+        "w": 8,
+        "x": 8,
+        "y": 8
       },
       "fill": 0,
-      "fillGradient": 0,
-      "hiddenSeries": false,
-      "id": 54,
-      "legend": {
-        "alignAsTable": true,
-        "avg": true,
-        "current": true,
-        "hideEmpty": false,
-        "hideZero": true,
-        "max": true,
-        "min": false,
-        "rightSide": false,
-        "show": true,
-        "sort": "current",
-        "sortDesc": true,
-        "total": false,
-        "values": true
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": null,
-      "options": {
-        "alertThreshold": true
-      },
-      "percentage": false,
-      "pluginVersion": "7.5.17",
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [
-        {
-          "$$hashKey": "object:2987",
-          "alias": "MAX",
-          "dashes": true,
-          "color": "#1F60C4",
-          "fill": 0,
-          "stack": false
-        },
-        {
-          "$$hashKey": "object:78",
-          "alias": "/FINISHED|FAILED|DEAD|REMOVED|Failed Nodes:/",
-          "hiddenSeries": true
-        },
-        {
-          "$$hashKey": "object:2987",
-          "alias": "MAX + PENDING",
-          "dashes": true,
-          "color": "#777777",
-          "fill": 0,
-          "stack": false
-        }
-      ],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "exemplar": true,
-          "expr": "sum(ray_node_cpu_utilization{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (instance, RayNodeType)",
-          "interval": "",
-          "legendFormat": "CPU Usage: {{instance}} ({{RayNodeType}})",
-          "queryType": "randomWalk",
-          "refId": "A"
-        }
-      ],
-      "thresholds": [],
-      "timeFrom": null,
-      "timeRegions": [],
-      "timeShift": null,
-      "title": "Node CPU Usage %",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "buckets": null,
-        "mode": "time",
-        "name": null,
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "$$hashKey": "object:628",
-          "format": "%",
-          "label": "",
-          "logBase": 1,
-          "max": null,
-          "min": "0",
-          "show": true
-        },
-        {
-          "$$hashKey": "object:629",
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false,
-        "alignLevel": null
-      }
-    },
-    {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": "${datasource}",
-      "description": "The physical (hardware) memory usage for each node. The dotted line means the total amount of memory from the cluster. Node memory is a sum of object store memory (shared memory) and heap memory.\n\nNote: If Ray is deployed within a container, the total memory could be lower than the host machine because Ray may reserve some additional memory space outside the container.",
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 26
-      },
-      "fill": 10,
-      "fillGradient": 0,
-      "hiddenSeries": false,
-      "id": 4,
-      "legend": {
-        "alignAsTable": true,
-        "avg": true,
-        "current": true,
-        "hideEmpty": false,
-        "hideZero": true,
-        "max": true,
-        "min": false,
-        "rightSide": false,
-        "show": true,
-        "sort": "current",
-        "sortDesc": true,
-        "total": false,
-        "values": true
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "connected",
-      "options": {
-        "alertThreshold": true
-      },
-      "percentage": false,
-      "pluginVersion": "7.5.17",
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [
-        {
-          "$$hashKey": "object:2987",
-          "alias": "MAX",
-          "dashes": true,
-          "color": "#1F60C4",
-          "fill": 0,
-          "stack": false
-        },
-        {
-          "$$hashKey": "object:78",
-          "alias": "/FINISHED|FAILED|DEAD|REMOVED|Failed Nodes:/",
-          "hiddenSeries": true
-        },
-        {
-          "$$hashKey": "object:2987",
-          "alias": "MAX + PENDING",
-          "dashes": true,
-          "color": "#777777",
-          "fill": 0,
-          "stack": false
-        }
-      ],
-      "spaceLength": 10,
-      "stack": true,
-      "steppedLine": false,
-      "targets": [
-        {
-          "exemplar": true,
-          "expr": "sum(ray_node_mem_used{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (instance, RayNodeType)",
-          "interval": "",
-          "legendFormat": "Memory Used: {{instance}} ({{RayNodeType}})",
-          "queryType": "randomWalk",
-          "refId": "A"
-        },
-        {
-          "exemplar": true,
-          "expr": "sum(ray_node_mem_total{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"})",
-          "interval": "",
-          "legendFormat": "MAX",
-          "queryType": "randomWalk",
-          "refId": "B"
-        }
-      ],
-      "thresholds": [],
-      "timeFrom": null,
-      "timeRegions": [],
-      "timeShift": null,
-      "title": "Node Memory Usage (heap + object store)",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "buckets": null,
-        "mode": "time",
-        "name": null,
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "$$hashKey": "object:628",
-          "format": "bytes",
-          "label": "",
-          "logBase": 1,
-          "max": null,
-          "min": "0",
-          "show": true
-        },
-        {
-          "$$hashKey": "object:629",
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false,
-        "alignLevel": null
-      }
-    },
-    {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": "${datasource}",
-      "description": "The percentage of physical (hardware) memory usage for each node.",
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 26
-      },
-      "fill": 0,
-      "fillGradient": 0,
-      "hiddenSeries": false,
-      "id": 48,
-      "legend": {
-        "alignAsTable": true,
-        "avg": true,
-        "current": true,
-        "hideEmpty": false,
-        "hideZero": true,
-        "max": true,
-        "min": false,
-        "rightSide": false,
-        "show": true,
-        "sort": "current",
-        "sortDesc": true,
-        "total": false,
-        "values": true
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": null,
-      "options": {
-        "alertThreshold": true
-      },
-      "percentage": false,
-      "pluginVersion": "7.5.17",
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [
-        {
-          "$$hashKey": "object:2987",
-          "alias": "MAX",
-          "dashes": true,
-          "color": "#1F60C4",
-          "fill": 0,
-          "stack": false
-        },
-        {
-          "$$hashKey": "object:78",
-          "alias": "/FINISHED|FAILED|DEAD|REMOVED|Failed Nodes:/",
-          "hiddenSeries": true
-        },
-        {
-          "$$hashKey": "object:2987",
-          "alias": "MAX + PENDING",
-          "dashes": true,
-          "color": "#777777",
-          "fill": 0,
-          "stack": false
-        }
-      ],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "exemplar": true,
-          "expr": "sum(ray_node_mem_used{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (instance, RayNodeType) * 100 / sum(ray_node_mem_total{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (instance, RayNodeType)",
-          "interval": "",
-          "legendFormat": "Memory Used: {{instance}} ({{RayNodeType}})",
-          "queryType": "randomWalk",
-          "refId": "A"
-        }
-      ],
-      "thresholds": [],
-      "timeFrom": null,
-      "timeRegions": [],
-      "timeShift": null,
-      "title": "Node Memory Usage % (heap + object store)",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "buckets": null,
-        "mode": "time",
-        "name": null,
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "$$hashKey": "object:628",
-          "format": "%",
-          "label": "",
-          "logBase": 1,
-          "max": null,
-          "min": "0",
-          "show": true
-        },
-        {
-          "$$hashKey": "object:629",
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false,
-        "alignLevel": null
-      }
-    },
-    {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": "${datasource}",
-      "description": "Node's physical (hardware) disk usage. The dotted line means the total amount of disk space from the cluster.\n\nNOTE: When Ray is deployed within a container, this shows the disk usage from the host machine. ",
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 34
-      },
-      "fill": 10,
       "fillGradient": 0,
       "hiddenSeries": false,
       "id": 6,
@@ -1036,7 +520,7 @@
       },
       "lines": true,
       "linewidth": 1,
-      "nullPointMode": "connected",
+      "nullPointMode": null,
       "options": {
         "alertThreshold": true
       },
@@ -1069,22 +553,22 @@
         }
       ],
       "spaceLength": 10,
-      "stack": true,
+      "stack": false,
       "steppedLine": false,
       "targets": [
         {
           "exemplar": true,
-          "expr": "sum(ray_node_disk_usage{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (instance, RayNodeType)",
+          "expr": "sum(ray_train_worker_group_start_total_time_s{ray_train_run_name=~\"$TrainRunName\", ray_train_run_id=~\"$TrainRunId\", SessionName=~\"$SessionName\"}) by (ray_train_run_name)",
           "interval": "",
-          "legendFormat": "Disk Used: {{instance}} ({{RayNodeType}})",
+          "legendFormat": "Run Name: {{ray_train_run_name}}, Worker Group Start Time",
           "queryType": "randomWalk",
           "refId": "A"
         },
         {
           "exemplar": true,
-          "expr": "sum(ray_node_disk_free{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) + sum(ray_node_disk_usage{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"})",
+          "expr": "sum(ray_train_worker_group_shutdown_total_time_s{ray_train_run_name=~\"$TrainRunName\", ray_train_run_id=~\"$TrainRunId\", SessionName=~\"$SessionName\"}) by (ray_train_run_name)",
           "interval": "",
-          "legendFormat": "MAX",
+          "legendFormat": "Run Name: {{ray_train_run_name}}, Worker Group Shutdown Time",
           "queryType": "randomWalk",
           "refId": "B"
         }
@@ -1093,7 +577,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Node Disk Usage",
+      "title": "Controller Operation Time",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -1110,7 +594,7 @@
       "yaxes": [
         {
           "$$hashKey": "object:628",
-          "format": "bytes",
+          "format": "seconds",
           "label": "",
           "logBase": 1,
           "max": null,
@@ -1138,21 +622,21 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${datasource}",
-      "description": "Node's physical (hardware) disk usage. \n\nNOTE: When Ray is deployed within a container, this shows the disk usage from the host machine. ",
+      "description": "Time taken to report a checkpoint to storage.",
       "fieldConfig": {
         "defaults": {},
         "overrides": []
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 34
+        "w": 8,
+        "x": 16,
+        "y": 8
       },
       "fill": 0,
       "fillGradient": 0,
       "hiddenSeries": false,
-      "id": 57,
+      "id": 7,
       "legend": {
         "alignAsTable": true,
         "avg": true,
@@ -1208,9 +692,9 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "sum(ray_node_disk_usage{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (instance, RayNodeType) * 100 / (sum(ray_node_disk_free{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (instance, RayNodeType) + sum(ray_node_disk_usage{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (instance, RayNodeType))",
+          "expr": "sum(ray_train_report_total_blocked_time_s{ray_train_run_name=~\"$TrainRunName\", ray_train_run_id=~\"$TrainRunId\", ray_train_worker_world_rank=~\"$TrainWorkerWorldRank\", ray_train_worker_actor_id=~\"$TrainWorkerActorId\", SessionName=~\"$SessionName\"}) by (ray_train_run_name, ray_train_worker_world_rank, ray_train_worker_actor_id)",
           "interval": "",
-          "legendFormat": "Disk Used: {{instance}} ({{RayNodeType}})",
+          "legendFormat": "Run Name: {{ray_train_run_name}}, World Rank: {{ray_train_worker_world_rank}}",
           "queryType": "randomWalk",
           "refId": "A"
         }
@@ -1219,7 +703,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Node Disk Usage %",
+      "title": "Checkpoint Report Time",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -1236,7 +720,7 @@
       "yaxes": [
         {
           "$$hashKey": "object:628",
-          "format": "%",
+          "format": "seconds",
           "label": "",
           "logBase": 1,
           "max": null,
@@ -1259,6 +743,19 @@
       }
     },
     {
+      "type": "row",
+      "title": "GPU Utilization",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
+      "id": 8,
+      "panels": []
+    },
+    {
       "aliasColors": {},
       "bars": false,
       "dashLength": 10,
@@ -1273,12 +770,12 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 42
+        "y": 17
       },
       "fill": 10,
       "fillGradient": 0,
       "hiddenSeries": false,
-      "id": 8,
+      "id": 9,
       "legend": {
         "alignAsTable": true,
         "avg": true,
@@ -1334,7 +831,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "sum(ray_node_gpus_utilization{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"} / 100) by (instance, RayNodeType, GpuIndex, GpuDeviceName)",
+          "expr": "sum(ray_node_gpus_utilization{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\"} / 100) by (instance, RayNodeType, GpuIndex, GpuDeviceName)",
           "interval": "",
           "legendFormat": "GPU Usage: {{instance}} ({{RayNodeType}}), gpu.{{GpuIndex}}, {{GpuDeviceName}}",
           "queryType": "randomWalk",
@@ -1342,7 +839,7 @@
         },
         {
           "exemplar": true,
-          "expr": "sum(ray_node_gpus_available{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"})",
+          "expr": "sum(ray_node_gpus_available{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\"})",
           "interval": "",
           "legendFormat": "MAX",
           "queryType": "randomWalk",
@@ -1407,12 +904,12 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 42
+        "y": 17
       },
       "fill": 0,
       "fillGradient": 0,
       "hiddenSeries": false,
-      "id": 55,
+      "id": 10,
       "legend": {
         "alignAsTable": true,
         "avg": true,
@@ -1468,7 +965,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "sum(ray_node_gpus_utilization{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (instance, RayNodeType, GpuIndex, GpuDeviceName)",
+          "expr": "sum(ray_node_gpus_utilization{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\"}) by (instance, RayNodeType, GpuIndex, GpuDeviceName)",
           "interval": "",
           "legendFormat": "GPU Usage: {{instance}} ({{RayNodeType}}), gpu.{{GpuIndex}}, {{GpuDeviceName}}",
           "queryType": "randomWalk",
@@ -1533,12 +1030,12 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 50
+        "y": 25
       },
       "fill": 10,
       "fillGradient": 0,
       "hiddenSeries": false,
-      "id": 18,
+      "id": 11,
       "legend": {
         "alignAsTable": true,
         "avg": true,
@@ -1594,7 +1091,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "sum(ray_node_gram_used{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"} * 1024 * 1024) by (instance, RayNodeType, GpuIndex, GpuDeviceName)",
+          "expr": "sum(ray_node_gram_used{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\"} * 1024 * 1024) by (instance, RayNodeType, GpuIndex, GpuDeviceName)",
           "interval": "",
           "legendFormat": "Used GRAM: {{instance}} ({{RayNodeType}}), gpu.{{GpuIndex}}, {{GpuDeviceName}}",
           "queryType": "randomWalk",
@@ -1602,7 +1099,7 @@
         },
         {
           "exemplar": true,
-          "expr": "(sum(ray_node_gram_available{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) + sum(ray_node_gram_used{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"})) * 1024 * 1024",
+          "expr": "(sum(ray_node_gram_available{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\"}) + sum(ray_node_gram_used{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\"})) * 1024 * 1024",
           "interval": "",
           "legendFormat": "MAX",
           "queryType": "randomWalk",
@@ -1667,12 +1164,12 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 50
+        "y": 25
       },
       "fill": 0,
       "fillGradient": 0,
       "hiddenSeries": false,
-      "id": 56,
+      "id": 12,
       "legend": {
         "alignAsTable": true,
         "avg": true,
@@ -1728,7 +1225,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "sum(ray_node_gram_used{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (instance, RayNodeType, GpuIndex, GpuDeviceName) * 100 / (sum(ray_node_gram_available{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (instance, RayNodeType, GpuIndex, GpuDeviceName) + sum(ray_node_gram_used{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (instance, RayNodeType, GpuIndex, GpuDeviceName))",
+          "expr": "sum(ray_node_gram_used{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\"}) by (instance, RayNodeType, GpuIndex, GpuDeviceName) * 100 / (sum(ray_node_gram_available{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\"}) by (instance, RayNodeType, GpuIndex, GpuDeviceName) + sum(ray_node_gram_used{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\"}) by (instance, RayNodeType, GpuIndex, GpuDeviceName))",
           "interval": "",
           "legendFormat": "Used GRAM: {{instance}} ({{RayNodeType}}), gpu.{{GpuIndex}}, {{GpuDeviceName}}",
           "queryType": "randomWalk",
@@ -1779,12 +1276,25 @@
       }
     },
     {
+      "type": "row",
+      "title": "CPU & Memory",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 33
+      },
+      "id": 13,
+      "panels": []
+    },
+    {
       "aliasColors": {},
       "bars": false,
       "dashLength": 10,
       "dashes": false,
       "datasource": "${datasource}",
-      "description": "Disk IO per node.",
+      "description": "The physical (hardware) CPU usage for each node.",
       "fieldConfig": {
         "defaults": {},
         "overrides": []
@@ -1793,12 +1303,12 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 58
+        "y": 34
       },
       "fill": 10,
       "fillGradient": 0,
       "hiddenSeries": false,
-      "id": 32,
+      "id": 14,
       "legend": {
         "alignAsTable": true,
         "avg": true,
@@ -1854,17 +1364,17 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "sum(ray_node_disk_io_write_speed{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (instance, RayNodeType)",
+          "expr": "sum(ray_node_cpu_utilization{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\"} * ray_node_cpu_count{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\",SessionName=~\"$SessionName\"} / 100) by (instance, RayNodeType)",
           "interval": "",
-          "legendFormat": "Write: {{instance}} ({{RayNodeType}})",
+          "legendFormat": "CPU Usage: {{instance}} ({{RayNodeType}})",
           "queryType": "randomWalk",
           "refId": "A"
         },
         {
           "exemplar": true,
-          "expr": "sum(ray_node_disk_io_read_speed{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (instance, RayNodeType)",
+          "expr": "sum(ray_node_cpu_count{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\"})",
           "interval": "",
-          "legendFormat": "Read: {{instance}} ({{RayNodeType}})",
+          "legendFormat": "MAX",
           "queryType": "randomWalk",
           "refId": "B"
         }
@@ -1873,7 +1383,540 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Node Disk IO Speed",
+      "title": "Node CPU Usage",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "$$hashKey": "object:628",
+          "format": "cores",
+          "label": "",
+          "logBase": 1,
+          "max": null,
+          "min": "0",
+          "show": true
+        },
+        {
+          "$$hashKey": "object:629",
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "${datasource}",
+      "description": "The percentage of physical (hardware) CPU usage for each node.",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 34
+      },
+      "fill": 0,
+      "fillGradient": 0,
+      "hiddenSeries": false,
+      "id": 15,
+      "legend": {
+        "alignAsTable": true,
+        "avg": true,
+        "current": true,
+        "hideEmpty": false,
+        "hideZero": true,
+        "max": true,
+        "min": false,
+        "rightSide": false,
+        "show": true,
+        "sort": "current",
+        "sortDesc": true,
+        "total": false,
+        "values": true
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": null,
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "7.5.17",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [
+        {
+          "$$hashKey": "object:2987",
+          "alias": "MAX",
+          "dashes": true,
+          "color": "#1F60C4",
+          "fill": 0,
+          "stack": false
+        },
+        {
+          "$$hashKey": "object:78",
+          "alias": "/FINISHED|FAILED|DEAD|REMOVED|Failed Nodes:/",
+          "hiddenSeries": true
+        },
+        {
+          "$$hashKey": "object:2987",
+          "alias": "MAX + PENDING",
+          "dashes": true,
+          "color": "#777777",
+          "fill": 0,
+          "stack": false
+        }
+      ],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "exemplar": true,
+          "expr": "sum(ray_node_cpu_utilization{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\"}) by (instance, RayNodeType)",
+          "interval": "",
+          "legendFormat": "CPU Usage: {{instance}} ({{RayNodeType}})",
+          "queryType": "randomWalk",
+          "refId": "A"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Node CPU Usage %",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "$$hashKey": "object:628",
+          "format": "%",
+          "label": "",
+          "logBase": 1,
+          "max": null,
+          "min": "0",
+          "show": true
+        },
+        {
+          "$$hashKey": "object:629",
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "${datasource}",
+      "description": "The physical (hardware) memory usage for each node. The dotted line means the total amount of memory from the cluster. Node memory is a sum of object store memory (shared memory) and heap memory.\n\nNote: If Ray is deployed within a container, the total memory could be lower than the host machine because Ray may reserve some additional memory space outside the container.",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 42
+      },
+      "fill": 10,
+      "fillGradient": 0,
+      "hiddenSeries": false,
+      "id": 16,
+      "legend": {
+        "alignAsTable": true,
+        "avg": true,
+        "current": true,
+        "hideEmpty": false,
+        "hideZero": true,
+        "max": true,
+        "min": false,
+        "rightSide": false,
+        "show": true,
+        "sort": "current",
+        "sortDesc": true,
+        "total": false,
+        "values": true
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "connected",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "7.5.17",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [
+        {
+          "$$hashKey": "object:2987",
+          "alias": "MAX",
+          "dashes": true,
+          "color": "#1F60C4",
+          "fill": 0,
+          "stack": false
+        },
+        {
+          "$$hashKey": "object:78",
+          "alias": "/FINISHED|FAILED|DEAD|REMOVED|Failed Nodes:/",
+          "hiddenSeries": true
+        },
+        {
+          "$$hashKey": "object:2987",
+          "alias": "MAX + PENDING",
+          "dashes": true,
+          "color": "#777777",
+          "fill": 0,
+          "stack": false
+        }
+      ],
+      "spaceLength": 10,
+      "stack": true,
+      "steppedLine": false,
+      "targets": [
+        {
+          "exemplar": true,
+          "expr": "sum(ray_node_mem_used{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\"}) by (instance, RayNodeType)",
+          "interval": "",
+          "legendFormat": "Memory Used: {{instance}} ({{RayNodeType}})",
+          "queryType": "randomWalk",
+          "refId": "A"
+        },
+        {
+          "exemplar": true,
+          "expr": "sum(ray_node_mem_total{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\"})",
+          "interval": "",
+          "legendFormat": "MAX",
+          "queryType": "randomWalk",
+          "refId": "B"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Node Memory Usage (heap + object store)",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "$$hashKey": "object:628",
+          "format": "bytes",
+          "label": "",
+          "logBase": 1,
+          "max": null,
+          "min": "0",
+          "show": true
+        },
+        {
+          "$$hashKey": "object:629",
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "${datasource}",
+      "description": "The percentage of physical (hardware) memory usage for each node.",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 42
+      },
+      "fill": 0,
+      "fillGradient": 0,
+      "hiddenSeries": false,
+      "id": 17,
+      "legend": {
+        "alignAsTable": true,
+        "avg": true,
+        "current": true,
+        "hideEmpty": false,
+        "hideZero": true,
+        "max": true,
+        "min": false,
+        "rightSide": false,
+        "show": true,
+        "sort": "current",
+        "sortDesc": true,
+        "total": false,
+        "values": true
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": null,
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "7.5.17",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [
+        {
+          "$$hashKey": "object:2987",
+          "alias": "MAX",
+          "dashes": true,
+          "color": "#1F60C4",
+          "fill": 0,
+          "stack": false
+        },
+        {
+          "$$hashKey": "object:78",
+          "alias": "/FINISHED|FAILED|DEAD|REMOVED|Failed Nodes:/",
+          "hiddenSeries": true
+        },
+        {
+          "$$hashKey": "object:2987",
+          "alias": "MAX + PENDING",
+          "dashes": true,
+          "color": "#777777",
+          "fill": 0,
+          "stack": false
+        }
+      ],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "exemplar": true,
+          "expr": "sum(ray_node_mem_used{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\"}) by (instance, RayNodeType) * 100 / sum(ray_node_mem_total{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\"}) by (instance, RayNodeType)",
+          "interval": "",
+          "legendFormat": "Memory Used: {{instance}} ({{RayNodeType}})",
+          "queryType": "randomWalk",
+          "refId": "A"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Node Memory Usage % (heap + object store)",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "$$hashKey": "object:628",
+          "format": "%",
+          "label": "",
+          "logBase": 1,
+          "max": null,
+          "min": "0",
+          "show": true
+        },
+        {
+          "$$hashKey": "object:629",
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "type": "row",
+      "title": "Network & Disk",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 50
+      },
+      "id": 18,
+      "panels": []
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "${datasource}",
+      "description": "Network speed per node",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 51
+      },
+      "fill": 10,
+      "fillGradient": 0,
+      "hiddenSeries": false,
+      "id": 19,
+      "legend": {
+        "alignAsTable": true,
+        "avg": true,
+        "current": true,
+        "hideEmpty": false,
+        "hideZero": true,
+        "max": true,
+        "min": false,
+        "rightSide": false,
+        "show": true,
+        "sort": "current",
+        "sortDesc": true,
+        "total": false,
+        "values": true
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "connected",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "7.5.17",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [
+        {
+          "$$hashKey": "object:2987",
+          "alias": "MAX",
+          "dashes": true,
+          "color": "#1F60C4",
+          "fill": 0,
+          "stack": false
+        },
+        {
+          "$$hashKey": "object:78",
+          "alias": "/FINISHED|FAILED|DEAD|REMOVED|Failed Nodes:/",
+          "hiddenSeries": true
+        },
+        {
+          "$$hashKey": "object:2987",
+          "alias": "MAX + PENDING",
+          "dashes": true,
+          "color": "#777777",
+          "fill": 0,
+          "stack": false
+        }
+      ],
+      "spaceLength": 10,
+      "stack": true,
+      "steppedLine": false,
+      "targets": [
+        {
+          "exemplar": true,
+          "expr": "sum(ray_node_network_receive_speed{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\"}) by (instance, RayNodeType)",
+          "interval": "",
+          "legendFormat": "Recv: {{instance}} ({{RayNodeType}})",
+          "queryType": "randomWalk",
+          "refId": "A"
+        },
+        {
+          "exemplar": true,
+          "expr": "sum(ray_node_network_send_speed{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\"}) by (instance, RayNodeType)",
+          "interval": "",
+          "legendFormat": "Send: {{instance}} ({{RayNodeType}})",
+          "queryType": "randomWalk",
+          "refId": "B"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Node Network",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -1918,7 +1961,7 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${datasource}",
-      "description": "Network speed per node",
+      "description": "Disk IO per node.",
       "fieldConfig": {
         "defaults": {},
         "overrides": []
@@ -1927,7 +1970,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 58
+        "y": 51
       },
       "fill": 10,
       "fillGradient": 0,
@@ -1988,17 +2031,17 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "sum(ray_node_network_receive_speed{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (instance, RayNodeType)",
+          "expr": "sum(ray_node_disk_io_write_speed{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\"}) by (instance, RayNodeType)",
           "interval": "",
-          "legendFormat": "Recv: {{instance}} ({{RayNodeType}})",
+          "legendFormat": "Write: {{instance}} ({{RayNodeType}})",
           "queryType": "randomWalk",
           "refId": "A"
         },
         {
           "exemplar": true,
-          "expr": "sum(ray_node_network_send_speed{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (instance, RayNodeType)",
+          "expr": "sum(ray_node_disk_io_read_speed{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\"}) by (instance, RayNodeType)",
           "interval": "",
-          "legendFormat": "Send: {{instance}} ({{RayNodeType}})",
+          "legendFormat": "Read: {{instance}} ({{RayNodeType}})",
           "queryType": "randomWalk",
           "refId": "B"
         }
@@ -2007,7 +2050,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Node Network",
+      "title": "Node Disk IO Speed",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -2047,25 +2090,12 @@
       }
     },
     {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 66
-      },
-      "id": 1004,
-      "title": "Hardware Utilization by Ray Component",
-      "type": "row",
-      "panels": []
-    },
-    {
       "aliasColors": {},
       "bars": false,
       "dashLength": 10,
       "dashes": false,
       "datasource": "${datasource}",
-      "description": "The physical (hardware) CPU usage across the cluster, broken down by component. This reports the summed CPU usage per Ray component. Ray components consist of system components (e.g., raylet, gcs, dashboard, or agent) and the process (that contains method names) names of running tasks/actors.",
+      "description": "Node's physical (hardware) disk usage. The dotted line means the total amount of disk space from the cluster.\n\nNOTE: When Ray is deployed within a container, this shows the disk usage from the host machine. ",
       "fieldConfig": {
         "defaults": {},
         "overrides": []
@@ -2074,12 +2104,12 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 67
+        "y": 59
       },
       "fill": 10,
       "fillGradient": 0,
       "hiddenSeries": false,
-      "id": 37,
+      "id": 21,
       "legend": {
         "alignAsTable": true,
         "avg": true,
@@ -2135,15 +2165,15 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "sum(ray_component_cpu_percentage{instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (Component) / 100",
+          "expr": "sum(ray_node_disk_usage{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\"}) by (instance, RayNodeType)",
           "interval": "",
-          "legendFormat": "{{Component}}",
+          "legendFormat": "Disk Used: {{instance}} ({{RayNodeType}})",
           "queryType": "randomWalk",
           "refId": "A"
         },
         {
           "exemplar": true,
-          "expr": "sum(ray_node_cpu_count{instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"})",
+          "expr": "sum(ray_node_disk_free{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\"}) + sum(ray_node_disk_usage{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\"})",
           "interval": "",
           "legendFormat": "MAX",
           "queryType": "randomWalk",
@@ -2154,149 +2184,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Node CPU Usage by Component",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "buckets": null,
-        "mode": "time",
-        "name": null,
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "$$hashKey": "object:628",
-          "format": "cores",
-          "label": "",
-          "logBase": 1,
-          "max": null,
-          "min": "0",
-          "show": true
-        },
-        {
-          "$$hashKey": "object:629",
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false,
-        "alignLevel": null
-      }
-    },
-    {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": "${datasource}",
-      "description": "The physical (hardware) memory usage across the cluster, broken down by component. This reports the summed RSS-SHM per Ray component, which corresponds to an approximate memory usage per proc. Ray components consist of system components (e.g., raylet, gcs, dashboard, or agent) and the process (that contains method names) names of running tasks/actors.",
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 67
-      },
-      "fill": 10,
-      "fillGradient": 0,
-      "hiddenSeries": false,
-      "id": 34,
-      "legend": {
-        "alignAsTable": true,
-        "avg": true,
-        "current": true,
-        "hideEmpty": false,
-        "hideZero": true,
-        "max": true,
-        "min": false,
-        "rightSide": false,
-        "show": true,
-        "sort": "current",
-        "sortDesc": true,
-        "total": false,
-        "values": true
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "connected",
-      "options": {
-        "alertThreshold": true
-      },
-      "percentage": false,
-      "pluginVersion": "7.5.17",
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [
-        {
-          "$$hashKey": "object:2987",
-          "alias": "MAX",
-          "dashes": true,
-          "color": "#1F60C4",
-          "fill": 0,
-          "stack": false
-        },
-        {
-          "$$hashKey": "object:78",
-          "alias": "/FINISHED|FAILED|DEAD|REMOVED|Failed Nodes:/",
-          "hiddenSeries": true
-        },
-        {
-          "$$hashKey": "object:2987",
-          "alias": "MAX + PENDING",
-          "dashes": true,
-          "color": "#777777",
-          "fill": 0,
-          "stack": false
-        }
-      ],
-      "spaceLength": 10,
-      "stack": true,
-      "steppedLine": false,
-      "targets": [
-        {
-          "exemplar": true,
-          "expr": "(sum(ray_component_rss_mb{instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"} * 1024 * 1024) by (Component)) - (sum(ray_component_mem_shared_bytes{instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (Component))",
-          "interval": "",
-          "legendFormat": "{{Component}}",
-          "queryType": "randomWalk",
-          "refId": "A"
-        },
-        {
-          "exemplar": true,
-          "expr": "sum(ray_node_mem_shared_bytes{instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"})",
-          "interval": "",
-          "legendFormat": "shared_memory",
-          "queryType": "randomWalk",
-          "refId": "B"
-        },
-        {
-          "exemplar": true,
-          "expr": "sum(ray_node_mem_total{instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"})",
-          "interval": "",
-          "legendFormat": "MAX",
-          "queryType": "randomWalk",
-          "refId": "C"
-        }
-      ],
-      "thresholds": [],
-      "timeFrom": null,
-      "timeRegions": [],
-      "timeShift": null,
-      "title": "Node Memory Usage by Component",
+      "title": "Node Disk Usage",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -2341,133 +2229,7 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${datasource}",
-      "description": "The physical (hardware) GPU usage across the cluster, broken down by component. This reports the summed GPU usage per Ray component.",
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 75
-      },
-      "fill": 10,
-      "fillGradient": 0,
-      "hiddenSeries": false,
-      "id": 45,
-      "legend": {
-        "alignAsTable": true,
-        "avg": true,
-        "current": true,
-        "hideEmpty": false,
-        "hideZero": true,
-        "max": true,
-        "min": false,
-        "rightSide": false,
-        "show": true,
-        "sort": "current",
-        "sortDesc": true,
-        "total": false,
-        "values": true
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "connected",
-      "options": {
-        "alertThreshold": true
-      },
-      "percentage": false,
-      "pluginVersion": "7.5.17",
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [
-        {
-          "$$hashKey": "object:2987",
-          "alias": "MAX",
-          "dashes": true,
-          "color": "#1F60C4",
-          "fill": 0,
-          "stack": false
-        },
-        {
-          "$$hashKey": "object:78",
-          "alias": "/FINISHED|FAILED|DEAD|REMOVED|Failed Nodes:/",
-          "hiddenSeries": true
-        },
-        {
-          "$$hashKey": "object:2987",
-          "alias": "MAX + PENDING",
-          "dashes": true,
-          "color": "#777777",
-          "fill": 0,
-          "stack": false
-        }
-      ],
-      "spaceLength": 10,
-      "stack": true,
-      "steppedLine": false,
-      "targets": [
-        {
-          "exemplar": true,
-          "expr": "sum(ray_component_gpu_percentage{SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"} / 100) by (Component)",
-          "interval": "",
-          "legendFormat": "{{Component}}",
-          "queryType": "randomWalk",
-          "refId": "A"
-        }
-      ],
-      "thresholds": [],
-      "timeFrom": null,
-      "timeRegions": [],
-      "timeShift": null,
-      "title": "Node GPU Usage by Component",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "buckets": null,
-        "mode": "time",
-        "name": null,
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "$$hashKey": "object:628",
-          "format": "GPUs",
-          "label": "",
-          "logBase": 1,
-          "max": null,
-          "min": "0",
-          "show": true
-        },
-        {
-          "$$hashKey": "object:629",
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false,
-        "alignLevel": null
-      }
-    },
-    {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": "${datasource}",
-      "description": "The physical (hardware) GPU memory usage across the cluster, broken down by component. This reports the summed GPU memory usage per Ray component.",
+      "description": "Node's physical (hardware) disk usage. \n\nNOTE: When Ray is deployed within a container, this shows the disk usage from the host machine. ",
       "fieldConfig": {
         "defaults": {},
         "overrides": []
@@ -2476,577 +2238,12 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 75
-      },
-      "fill": 10,
-      "fillGradient": 0,
-      "hiddenSeries": false,
-      "id": 46,
-      "legend": {
-        "alignAsTable": true,
-        "avg": true,
-        "current": true,
-        "hideEmpty": false,
-        "hideZero": true,
-        "max": true,
-        "min": false,
-        "rightSide": false,
-        "show": true,
-        "sort": "current",
-        "sortDesc": true,
-        "total": false,
-        "values": true
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "connected",
-      "options": {
-        "alertThreshold": true
-      },
-      "percentage": false,
-      "pluginVersion": "7.5.17",
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [
-        {
-          "$$hashKey": "object:2987",
-          "alias": "MAX",
-          "dashes": true,
-          "color": "#1F60C4",
-          "fill": 0,
-          "stack": false
-        },
-        {
-          "$$hashKey": "object:78",
-          "alias": "/FINISHED|FAILED|DEAD|REMOVED|Failed Nodes:/",
-          "hiddenSeries": true
-        },
-        {
-          "$$hashKey": "object:2987",
-          "alias": "MAX + PENDING",
-          "dashes": true,
-          "color": "#777777",
-          "fill": 0,
-          "stack": false
-        }
-      ],
-      "spaceLength": 10,
-      "stack": true,
-      "steppedLine": false,
-      "targets": [
-        {
-          "exemplar": true,
-          "expr": "sum(ray_component_gpu_memory_mb{SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"} * 1024 * 1024) by (Component)",
-          "interval": "",
-          "legendFormat": "{{Component}}",
-          "queryType": "randomWalk",
-          "refId": "A"
-        },
-        {
-          "exemplar": true,
-          "expr": "(sum(ray_node_gram_available{instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) + sum(ray_node_gram_used{instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"})) * 1024 * 1024",
-          "interval": "",
-          "legendFormat": "MAX",
-          "queryType": "randomWalk",
-          "refId": "B"
-        }
-      ],
-      "thresholds": [],
-      "timeFrom": null,
-      "timeRegions": [],
-      "timeShift": null,
-      "title": "Node GPU Memory Usage by Component",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "buckets": null,
-        "mode": "time",
-        "name": null,
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "$$hashKey": "object:628",
-          "format": "bytes",
-          "label": "",
-          "logBase": 1,
-          "max": null,
-          "min": "0",
-          "show": true
-        },
-        {
-          "$$hashKey": "object:629",
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false,
-        "alignLevel": null
-      }
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 83
-      },
-      "id": 1003,
-      "title": "Ray Resources by Node",
-      "type": "row",
-      "panels": []
-    },
-    {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": "${datasource}",
-      "description": "Logical CPU usage of Ray. The dotted line indicates the total number of CPUs. The logical CPU is allocated by `num_cpus` arguments from tasks and actors. PENDING means the number of CPUs that will be available when new nodes are up after the autoscaler scales up.\n\nNOTE: Ray's logical CPU is different from physical CPU usage. Ray's logical CPU is allocated by `num_cpus` arguments.",
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 84
-      },
-      "fill": 10,
-      "fillGradient": 0,
-      "hiddenSeries": false,
-      "id": 27,
-      "legend": {
-        "alignAsTable": true,
-        "avg": true,
-        "current": true,
-        "hideEmpty": false,
-        "hideZero": true,
-        "max": true,
-        "min": false,
-        "rightSide": false,
-        "show": true,
-        "sort": "current",
-        "sortDesc": true,
-        "total": false,
-        "values": true
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "connected",
-      "options": {
-        "alertThreshold": true
-      },
-      "percentage": false,
-      "pluginVersion": "7.5.17",
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [
-        {
-          "$$hashKey": "object:2987",
-          "alias": "MAX",
-          "dashes": true,
-          "color": "#1F60C4",
-          "fill": 0,
-          "stack": false
-        },
-        {
-          "$$hashKey": "object:78",
-          "alias": "/FINISHED|FAILED|DEAD|REMOVED|Failed Nodes:/",
-          "hiddenSeries": true
-        },
-        {
-          "$$hashKey": "object:2987",
-          "alias": "MAX + PENDING",
-          "dashes": true,
-          "color": "#777777",
-          "fill": 0,
-          "stack": false
-        }
-      ],
-      "spaceLength": 10,
-      "stack": true,
-      "steppedLine": false,
-      "targets": [
-        {
-          "exemplar": true,
-          "expr": "sum(ray_resources{Name=\"CPU\",State=\"USED\",instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (instance)",
-          "interval": "",
-          "legendFormat": "CPU Usage: {{instance}}",
-          "queryType": "randomWalk",
-          "refId": "A"
-        },
-        {
-          "exemplar": true,
-          "expr": "sum(ray_resources{Name=\"CPU\",instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"})",
-          "interval": "",
-          "legendFormat": "MAX",
-          "queryType": "randomWalk",
-          "refId": "B"
-        },
-        {
-          "exemplar": true,
-          "expr": "((sum(autoscaler_cluster_resources{resource=\"CPU\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) or vector(0)) + (sum(autoscaler_pending_resources{resource=\"CPU\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) or vector(0)) and (sum(autoscaler_cluster_resources{resource=\"CPU\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) or vector(0)) + (sum(autoscaler_pending_resources{resource=\"CPU\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) or vector(0)) > (sum(autoscaler_cluster_resources{resource=\"CPU\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) or vector(0)))",
-          "interval": "",
-          "legendFormat": "MAX + PENDING",
-          "queryType": "randomWalk",
-          "refId": "C"
-        }
-      ],
-      "thresholds": [],
-      "timeFrom": null,
-      "timeRegions": [],
-      "timeShift": null,
-      "title": "Logical CPUs Usage",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "buckets": null,
-        "mode": "time",
-        "name": null,
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "$$hashKey": "object:628",
-          "format": "cores",
-          "label": "",
-          "logBase": 1,
-          "max": null,
-          "min": "0",
-          "show": true
-        },
-        {
-          "$$hashKey": "object:629",
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false,
-        "alignLevel": null
-      }
-    },
-    {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": "${datasource}",
-      "description": "Logical GPU usage of Ray. The dotted line indicates the total number of GPUs. The logical GPU is allocated by `num_gpus` arguments from tasks and actors. PENDING means the number of GPUs that will be available when new nodes are up after the autoscaler scales up.",
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 84
-      },
-      "fill": 10,
-      "fillGradient": 0,
-      "hiddenSeries": false,
-      "id": 28,
-      "legend": {
-        "alignAsTable": true,
-        "avg": true,
-        "current": true,
-        "hideEmpty": false,
-        "hideZero": true,
-        "max": true,
-        "min": false,
-        "rightSide": false,
-        "show": true,
-        "sort": "current",
-        "sortDesc": true,
-        "total": false,
-        "values": true
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "connected",
-      "options": {
-        "alertThreshold": true
-      },
-      "percentage": false,
-      "pluginVersion": "7.5.17",
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [
-        {
-          "$$hashKey": "object:2987",
-          "alias": "MAX",
-          "dashes": true,
-          "color": "#1F60C4",
-          "fill": 0,
-          "stack": false
-        },
-        {
-          "$$hashKey": "object:78",
-          "alias": "/FINISHED|FAILED|DEAD|REMOVED|Failed Nodes:/",
-          "hiddenSeries": true
-        },
-        {
-          "$$hashKey": "object:2987",
-          "alias": "MAX + PENDING",
-          "dashes": true,
-          "color": "#777777",
-          "fill": 0,
-          "stack": false
-        }
-      ],
-      "spaceLength": 10,
-      "stack": true,
-      "steppedLine": false,
-      "targets": [
-        {
-          "exemplar": true,
-          "expr": "sum(ray_resources{Name=\"GPU\",State=\"USED\",instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (instance)",
-          "interval": "",
-          "legendFormat": "GPU Usage: {{instance}}",
-          "queryType": "randomWalk",
-          "refId": "A"
-        },
-        {
-          "exemplar": true,
-          "expr": "sum(ray_resources{Name=\"GPU\",instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"})",
-          "interval": "",
-          "legendFormat": "MAX",
-          "queryType": "randomWalk",
-          "refId": "B"
-        },
-        {
-          "exemplar": true,
-          "expr": "((sum(autoscaler_cluster_resources{resource=\"GPU\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) or vector(0)) + (sum(autoscaler_pending_resources{resource=\"GPU\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) or vector(0)) and (sum(autoscaler_cluster_resources{resource=\"GPU\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) or vector(0)) + (sum(autoscaler_pending_resources{resource=\"GPU\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) or vector(0)) > (sum(autoscaler_cluster_resources{resource=\"GPU\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) or vector(0)))",
-          "interval": "",
-          "legendFormat": "MAX + PENDING",
-          "queryType": "randomWalk",
-          "refId": "C"
-        }
-      ],
-      "thresholds": [],
-      "timeFrom": null,
-      "timeRegions": [],
-      "timeShift": null,
-      "title": "Logical GPUs Usage",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "buckets": null,
-        "mode": "time",
-        "name": null,
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "$$hashKey": "object:628",
-          "format": "GPUs",
-          "label": "",
-          "logBase": 1,
-          "max": null,
-          "min": "0",
-          "show": true
-        },
-        {
-          "$$hashKey": "object:629",
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false,
-        "alignLevel": null
-      }
-    },
-    {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": "${datasource}",
-      "description": "Object store memory usage by instance, including memory that has been spilled to disk. The dotted line indicates the object store memory capacity. This metric can go over the max capacity in case of spillage to disk.",
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 92
-      },
-      "fill": 10,
-      "fillGradient": 0,
-      "hiddenSeries": false,
-      "id": 58,
-      "legend": {
-        "alignAsTable": true,
-        "avg": true,
-        "current": true,
-        "hideEmpty": false,
-        "hideZero": true,
-        "max": true,
-        "min": false,
-        "rightSide": false,
-        "show": true,
-        "sort": "current",
-        "sortDesc": true,
-        "total": false,
-        "values": true
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "connected",
-      "options": {
-        "alertThreshold": true
-      },
-      "percentage": false,
-      "pluginVersion": "7.5.17",
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [
-        {
-          "$$hashKey": "object:2987",
-          "alias": "MAX",
-          "dashes": true,
-          "color": "#1F60C4",
-          "fill": 0,
-          "stack": false
-        },
-        {
-          "$$hashKey": "object:78",
-          "alias": "/FINISHED|FAILED|DEAD|REMOVED|Failed Nodes:/",
-          "hiddenSeries": true
-        },
-        {
-          "$$hashKey": "object:2987",
-          "alias": "MAX + PENDING",
-          "dashes": true,
-          "color": "#777777",
-          "fill": 0,
-          "stack": false
-        }
-      ],
-      "spaceLength": 10,
-      "stack": true,
-      "steppedLine": false,
-      "targets": [
-        {
-          "exemplar": true,
-          "expr": "sum(ray_object_store_memory{instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (instance)",
-          "interval": "",
-          "legendFormat": "{{instance}}",
-          "queryType": "randomWalk",
-          "refId": "A"
-        },
-        {
-          "exemplar": true,
-          "expr": "sum(ray_resources{Name=\"object_store_memory\",instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"})",
-          "interval": "",
-          "legendFormat": "MAX",
-          "queryType": "randomWalk",
-          "refId": "B"
-        }
-      ],
-      "thresholds": [],
-      "timeFrom": null,
-      "timeRegions": [],
-      "timeShift": null,
-      "title": "Object Store Memory Usage",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "buckets": null,
-        "mode": "time",
-        "name": null,
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "$$hashKey": "object:628",
-          "format": "bytes",
-          "label": "",
-          "logBase": 1,
-          "max": null,
-          "min": "0",
-          "show": true
-        },
-        {
-          "$$hashKey": "object:629",
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false,
-        "alignLevel": null
-      }
-    },
-    {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": "${datasource}",
-      "description": "Object store memory usage % by instance, including memory that has been spilled to disk. This metric can go over 100% in case of spillage to disk.",
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 92
+        "y": 59
       },
       "fill": 0,
       "fillGradient": 0,
       "hiddenSeries": false,
-      "id": 59,
+      "id": 22,
       "legend": {
         "alignAsTable": true,
         "avg": true,
@@ -3102,26 +2299,18 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "sum(ray_object_store_memory{instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (instance) * 100 / sum(ray_resources{Name=\"object_store_memory\",instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (instance)",
+          "expr": "sum(ray_node_disk_usage{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\"}) by (instance, RayNodeType) * 100 / (sum(ray_node_disk_free{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\"}) by (instance, RayNodeType) + sum(ray_node_disk_usage{instance=~\"$Instance\", RayNodeType=~\"$RayNodeType\", SessionName=~\"$SessionName\"}) by (instance, RayNodeType))",
           "interval": "",
-          "legendFormat": "{{instance}}",
+          "legendFormat": "Disk Used: {{instance}} ({{RayNodeType}})",
           "queryType": "randomWalk",
           "refId": "A"
-        },
-        {
-          "exemplar": true,
-          "expr": "100",
-          "interval": "",
-          "legendFormat": "MAX",
-          "queryType": "randomWalk",
-          "refId": "B"
         }
       ],
       "thresholds": [],
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Object Store Memory Usage %",
+      "title": "Node Disk Usage %",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -3161,142 +2350,16 @@
       }
     },
     {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": "${datasource}",
-      "description": "Object store memory that has been spilled to disk, by instance.",
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 100
-      },
-      "fill": 0,
-      "fillGradient": 0,
-      "hiddenSeries": false,
-      "id": 60,
-      "legend": {
-        "alignAsTable": true,
-        "avg": true,
-        "current": true,
-        "hideEmpty": false,
-        "hideZero": true,
-        "max": true,
-        "min": false,
-        "rightSide": false,
-        "show": true,
-        "sort": "current",
-        "sortDesc": true,
-        "total": false,
-        "values": true
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": null,
-      "options": {
-        "alertThreshold": true
-      },
-      "percentage": false,
-      "pluginVersion": "7.5.17",
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [
-        {
-          "$$hashKey": "object:2987",
-          "alias": "MAX",
-          "dashes": true,
-          "color": "#1F60C4",
-          "fill": 0,
-          "stack": false
-        },
-        {
-          "$$hashKey": "object:78",
-          "alias": "/FINISHED|FAILED|DEAD|REMOVED|Failed Nodes:/",
-          "hiddenSeries": true
-        },
-        {
-          "$$hashKey": "object:2987",
-          "alias": "MAX + PENDING",
-          "dashes": true,
-          "color": "#777777",
-          "fill": 0,
-          "stack": false
-        }
-      ],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "exemplar": true,
-          "expr": "sum(ray_object_store_memory{instance=~\"$Instance\",Location=\"SPILLED\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (instance)",
-          "interval": "",
-          "legendFormat": "{{instance}}",
-          "queryType": "randomWalk",
-          "refId": "A"
-        }
-      ],
-      "thresholds": [],
-      "timeFrom": null,
-      "timeRegions": [],
-      "timeShift": null,
-      "title": "Object Store Memory Spilled to Disk",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "buckets": null,
-        "mode": "time",
-        "name": null,
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "$$hashKey": "object:628",
-          "format": "bytes",
-          "label": "",
-          "logBase": 1,
-          "max": null,
-          "min": "0",
-          "show": true
-        },
-        {
-          "$$hashKey": "object:629",
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false,
-        "alignLevel": null
-      }
-    },
-    {
+      "type": "row",
+      "title": "Ray Tasks & Actors",
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 108
+        "y": 67
       },
-      "id": 1002,
-      "title": "Ray Tasks, Actors and Placement Groups",
-      "type": "row",
+      "id": 23,
       "panels": []
     },
     {
@@ -3314,12 +2377,12 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 109
+        "y": 68
       },
       "fill": 0,
       "fillGradient": 0,
       "hiddenSeries": false,
-      "id": 26,
+      "id": 24,
       "legend": {
         "alignAsTable": true,
         "avg": true,
@@ -3375,7 +2438,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "sum(max_over_time(ray_tasks{IsRetry=\"0\",State=~\"FINISHED|FAILED\",instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}[14d])) by (State) or clamp_min(sum(ray_tasks{IsRetry=\"0\",State!~\"FINISHED|FAILED\",instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (State), 0)",
+          "expr": "sum(max_over_time(ray_tasks{IsRetry=\"0\",State=~\"FINISHED|FAILED\",instance=~\"$Instance\",SessionName=~\"$SessionName\"}[14d])) by (State) or clamp_min(sum(ray_tasks{IsRetry=\"0\",State!~\"FINISHED|FAILED\",instance=~\"$Instance\",SessionName=~\"$SessionName\"}) by (State), 0)",
           "interval": "",
           "legendFormat": "{{State}}",
           "queryType": "randomWalk",
@@ -3383,7 +2446,7 @@
         },
         {
           "exemplar": true,
-          "expr": "sum(max_over_time(ray_tasks{IsRetry!=\"0\",State=~\"FINISHED|FAILED\",instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}[14d])) by (State) or clamp_min(sum(ray_tasks{IsRetry!=\"0\",State!~\"FINISHED|FAILED\",instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (State), 0)",
+          "expr": "sum(max_over_time(ray_tasks{IsRetry!=\"0\",State=~\"FINISHED|FAILED\",instance=~\"$Instance\",SessionName=~\"$SessionName\"}[14d])) by (State) or clamp_min(sum(ray_tasks{IsRetry!=\"0\",State!~\"FINISHED|FAILED\",instance=~\"$Instance\",SessionName=~\"$SessionName\"}) by (State), 0)",
           "interval": "",
           "legendFormat": "{{State}} (retry)",
           "queryType": "randomWalk",
@@ -3448,12 +2511,12 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 109
+        "y": 68
       },
       "fill": 0,
       "fillGradient": 0,
       "hiddenSeries": false,
-      "id": 35,
+      "id": 25,
       "legend": {
         "alignAsTable": true,
         "avg": true,
@@ -3509,7 +2572,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "clamp_min(sum(ray_tasks{IsRetry=\"0\",State!~\"FINISHED|FAILED\",instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (Name), 0)",
+          "expr": "clamp_min(sum(ray_tasks{IsRetry=\"0\",State!~\"FINISHED|FAILED\",instance=~\"$Instance\",SessionName=~\"$SessionName\"}) by (Name), 0)",
           "interval": "",
           "legendFormat": "{{Name}}",
           "queryType": "randomWalk",
@@ -3517,7 +2580,7 @@
         },
         {
           "exemplar": true,
-          "expr": "clamp_min(sum(ray_tasks{IsRetry!=\"0\",State!~\"FINISHED|FAILED\",instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (Name), 0)",
+          "expr": "clamp_min(sum(ray_tasks{IsRetry!=\"0\",State!~\"FINISHED|FAILED\",instance=~\"$Instance\",SessionName=~\"$SessionName\"}) by (Name), 0)",
           "interval": "",
           "legendFormat": "{{Name}} (retry)",
           "queryType": "randomWalk",
@@ -3573,140 +2636,6 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${datasource}",
-      "description": "Current count of tasks that are currently executing, grouped by task name. Task resubmissions due to failures or object reconstruction are shown with (retry) in the label.",
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 117
-      },
-      "fill": 0,
-      "fillGradient": 0,
-      "hiddenSeries": false,
-      "id": 38,
-      "legend": {
-        "alignAsTable": true,
-        "avg": true,
-        "current": true,
-        "hideEmpty": false,
-        "hideZero": true,
-        "max": true,
-        "min": false,
-        "rightSide": false,
-        "show": true,
-        "sort": "current",
-        "sortDesc": true,
-        "total": false,
-        "values": true
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": null,
-      "options": {
-        "alertThreshold": true
-      },
-      "percentage": false,
-      "pluginVersion": "7.5.17",
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [
-        {
-          "$$hashKey": "object:2987",
-          "alias": "MAX",
-          "dashes": true,
-          "color": "#1F60C4",
-          "fill": 0,
-          "stack": false
-        },
-        {
-          "$$hashKey": "object:78",
-          "alias": "/FINISHED|FAILED|DEAD|REMOVED|Failed Nodes:/",
-          "hiddenSeries": true
-        },
-        {
-          "$$hashKey": "object:2987",
-          "alias": "MAX + PENDING",
-          "dashes": true,
-          "color": "#777777",
-          "fill": 0,
-          "stack": false
-        }
-      ],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "exemplar": true,
-          "expr": "clamp_min(sum(ray_tasks{IsRetry=\"0\",State=~\"RUNNING*\",instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (Name), 0)",
-          "interval": "",
-          "legendFormat": "{{Name}}",
-          "queryType": "randomWalk",
-          "refId": "A"
-        },
-        {
-          "exemplar": true,
-          "expr": "clamp_min(sum(ray_tasks{IsRetry!=\"0\",State=~\"RUNNING*\",instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (Name), 0)",
-          "interval": "",
-          "legendFormat": "{{Name}} (retry)",
-          "queryType": "randomWalk",
-          "refId": "B"
-        }
-      ],
-      "thresholds": [],
-      "timeFrom": null,
-      "timeRegions": [],
-      "timeShift": null,
-      "title": "Running Tasks by Name",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "buckets": null,
-        "mode": "time",
-        "name": null,
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "$$hashKey": "object:628",
-          "format": "tasks",
-          "label": "",
-          "logBase": 1,
-          "max": null,
-          "min": "0",
-          "show": true
-        },
-        {
-          "$$hashKey": "object:629",
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false,
-        "alignLevel": null
-      }
-    },
-    {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": "${datasource}",
       "description": "Note: not impacted by \"Instance\" variable.\n\nCurrent count of actors, grouped by lifecycle state (e.g., alive, restarting, dead/terminated).\n\nState: the actor state, as described by rpc::ActorTableData proto in gcs.proto.",
       "fieldConfig": {
         "defaults": {},
@@ -3715,13 +2644,13 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
-        "y": 117
+        "x": 0,
+        "y": 76
       },
       "fill": 10,
       "fillGradient": 0,
       "hiddenSeries": false,
-      "id": 33,
+      "id": 26,
       "legend": {
         "alignAsTable": true,
         "avg": true,
@@ -3777,7 +2706,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "sum(ray_actors{Source=\"gcs\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (State)",
+          "expr": "sum(ray_actors{Source=\"gcs\",SessionName=~\"$SessionName\"}) by (State)",
           "interval": "",
           "legendFormat": "{{State}}",
           "queryType": "randomWalk",
@@ -3833,132 +2762,6 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${datasource}",
-      "description": "Current count of alive actors (i.e. not dead/terminated), grouped by state.\n\nState: the actor state, as described by rpc::ActorTableData proto in gcs.proto.",
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 125
-      },
-      "fill": 10,
-      "fillGradient": 0,
-      "hiddenSeries": false,
-      "id": 42,
-      "legend": {
-        "alignAsTable": true,
-        "avg": true,
-        "current": true,
-        "hideEmpty": false,
-        "hideZero": true,
-        "max": true,
-        "min": false,
-        "rightSide": false,
-        "show": true,
-        "sort": "current",
-        "sortDesc": true,
-        "total": false,
-        "values": true
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "connected",
-      "options": {
-        "alertThreshold": true
-      },
-      "percentage": false,
-      "pluginVersion": "7.5.17",
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [
-        {
-          "$$hashKey": "object:2987",
-          "alias": "MAX",
-          "dashes": true,
-          "color": "#1F60C4",
-          "fill": 0,
-          "stack": false
-        },
-        {
-          "$$hashKey": "object:78",
-          "alias": "/FINISHED|FAILED|DEAD|REMOVED|Failed Nodes:/",
-          "hiddenSeries": true
-        },
-        {
-          "$$hashKey": "object:2987",
-          "alias": "MAX + PENDING",
-          "dashes": true,
-          "color": "#777777",
-          "fill": 0,
-          "stack": false
-        }
-      ],
-      "spaceLength": 10,
-      "stack": true,
-      "steppedLine": false,
-      "targets": [
-        {
-          "exemplar": true,
-          "expr": "sum(ray_actors{Source=\"executor\",NodeAddress=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (State)",
-          "interval": "",
-          "legendFormat": "{{State}}",
-          "queryType": "randomWalk",
-          "refId": "A"
-        }
-      ],
-      "thresholds": [],
-      "timeFrom": null,
-      "timeRegions": [],
-      "timeShift": null,
-      "title": "Alive Actors by State",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "buckets": null,
-        "mode": "time",
-        "name": null,
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "$$hashKey": "object:628",
-          "format": "actors",
-          "label": "",
-          "logBase": 1,
-          "max": null,
-          "min": "0",
-          "show": true
-        },
-        {
-          "$$hashKey": "object:629",
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false,
-        "alignLevel": null
-      }
-    },
-    {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": "${datasource}",
       "description": "Current count of alive actors, grouped by actor name.",
       "fieldConfig": {
         "defaults": {},
@@ -3968,12 +2771,12 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 125
+        "y": 76
       },
       "fill": 10,
       "fillGradient": 0,
       "hiddenSeries": false,
-      "id": 36,
+      "id": 27,
       "legend": {
         "alignAsTable": true,
         "avg": true,
@@ -4029,7 +2832,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "sum(ray_actors{State!=\"DEAD\",Source=\"executor\",NodeAddress=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (Name)",
+          "expr": "sum(ray_actors{State!=\"DEAD\",Source=\"executor\",NodeAddress=~\"$Instance\",SessionName=~\"$SessionName\"}) by (Name)",
           "interval": "",
           "legendFormat": "{{Name}}",
           "queryType": "randomWalk",
@@ -4080,12 +2883,25 @@
       }
     },
     {
+      "type": "row",
+      "title": "Ray Resources",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 84
+      },
+      "id": 28,
+      "panels": []
+    },
+    {
       "aliasColors": {},
       "bars": false,
       "dashLength": 10,
       "dashes": false,
       "datasource": "${datasource}",
-      "description": "Note: not impacted by \"Instance\" variable.\n\nCurrent count of placement groups, grouped by state.\n\nState: the placement group state, as described by the rpc::PlacementGroupTableData proto in gcs.proto.",
+      "description": "Logical CPU usage of Ray. The dotted line indicates the total number of CPUs. The logical CPU is allocated by `num_cpus` arguments from tasks and actors. PENDING means the number of CPUs that will be available when new nodes are up after the autoscaler scales up.\n\nNOTE: Ray's logical CPU is different from physical CPU usage. Ray's logical CPU is allocated by `num_cpus` arguments.",
       "fieldConfig": {
         "defaults": {},
         "overrides": []
@@ -4094,133 +2910,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 133
-      },
-      "fill": 10,
-      "fillGradient": 0,
-      "hiddenSeries": false,
-      "id": 40,
-      "legend": {
-        "alignAsTable": true,
-        "avg": true,
-        "current": true,
-        "hideEmpty": false,
-        "hideZero": true,
-        "max": true,
-        "min": false,
-        "rightSide": false,
-        "show": true,
-        "sort": "current",
-        "sortDesc": true,
-        "total": false,
-        "values": true
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "connected",
-      "options": {
-        "alertThreshold": true
-      },
-      "percentage": false,
-      "pluginVersion": "7.5.17",
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [
-        {
-          "$$hashKey": "object:2987",
-          "alias": "MAX",
-          "dashes": true,
-          "color": "#1F60C4",
-          "fill": 0,
-          "stack": false
-        },
-        {
-          "$$hashKey": "object:78",
-          "alias": "/FINISHED|FAILED|DEAD|REMOVED|Failed Nodes:/",
-          "hiddenSeries": true
-        },
-        {
-          "$$hashKey": "object:2987",
-          "alias": "MAX + PENDING",
-          "dashes": true,
-          "color": "#777777",
-          "fill": 0,
-          "stack": false
-        }
-      ],
-      "spaceLength": 10,
-      "stack": true,
-      "steppedLine": false,
-      "targets": [
-        {
-          "exemplar": true,
-          "expr": "sum(ray_placement_groups{SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (State)",
-          "interval": "",
-          "legendFormat": "{{State}}",
-          "queryType": "randomWalk",
-          "refId": "A"
-        }
-      ],
-      "thresholds": [],
-      "timeFrom": null,
-      "timeRegions": [],
-      "timeShift": null,
-      "title": "All Placement Groups by State",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "buckets": null,
-        "mode": "time",
-        "name": null,
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "$$hashKey": "object:628",
-          "format": "placement groups",
-          "label": "",
-          "logBase": 1,
-          "max": null,
-          "min": "0",
-          "show": true
-        },
-        {
-          "$$hashKey": "object:629",
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false,
-        "alignLevel": null
-      }
-    },
-    {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": "${datasource}",
-      "description": "Object store memory usage by location. The dotted line indicates the object store memory capacity. This metric can go over the max capacity in case of spillage to disk.\n\nLocation: where the memory was allocated, which is MMAP_SHM or MMAP_DISK to indicate memory-mapped page, SPILLED to indicate spillage to disk, and WORKER_HEAP for objects small enough to be inlined in worker memory. Refer to metric_defs.cc for more information.",
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 133
+        "y": 85
       },
       "fill": 10,
       "fillGradient": 0,
@@ -4281,15 +2971,299 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "sum(ray_object_store_memory{instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (Location)",
+          "expr": "sum(ray_resources{Name=\"CPU\",State=\"USED\",instance=~\"$Instance\",SessionName=~\"$SessionName\"}) by (instance)",
           "interval": "",
-          "legendFormat": "{{Location}}",
+          "legendFormat": "CPU Usage: {{instance}}",
           "queryType": "randomWalk",
           "refId": "A"
         },
         {
           "exemplar": true,
-          "expr": "sum(ray_resources{Name=\"object_store_memory\",instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"})",
+          "expr": "sum(ray_resources{Name=\"CPU\",instance=~\"$Instance\",SessionName=~\"$SessionName\"})",
+          "interval": "",
+          "legendFormat": "MAX",
+          "queryType": "randomWalk",
+          "refId": "B"
+        },
+        {
+          "exemplar": true,
+          "expr": "((sum(autoscaler_cluster_resources{resource=\"CPU\",SessionName=~\"$SessionName\"}) or vector(0)) + (sum(autoscaler_pending_resources{resource=\"CPU\",SessionName=~\"$SessionName\"}) or vector(0)) and (sum(autoscaler_cluster_resources{resource=\"CPU\",SessionName=~\"$SessionName\"}) or vector(0)) + (sum(autoscaler_pending_resources{resource=\"CPU\",SessionName=~\"$SessionName\"}) or vector(0)) > (sum(autoscaler_cluster_resources{resource=\"CPU\",SessionName=~\"$SessionName\"}) or vector(0)))",
+          "interval": "",
+          "legendFormat": "MAX + PENDING",
+          "queryType": "randomWalk",
+          "refId": "C"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Logical CPUs Usage",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "$$hashKey": "object:628",
+          "format": "cores",
+          "label": "",
+          "logBase": 1,
+          "max": null,
+          "min": "0",
+          "show": true
+        },
+        {
+          "$$hashKey": "object:629",
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "${datasource}",
+      "description": "Logical GPU usage of Ray. The dotted line indicates the total number of GPUs. The logical GPU is allocated by `num_gpus` arguments from tasks and actors. PENDING means the number of GPUs that will be available when new nodes are up after the autoscaler scales up.",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 85
+      },
+      "fill": 10,
+      "fillGradient": 0,
+      "hiddenSeries": false,
+      "id": 30,
+      "legend": {
+        "alignAsTable": true,
+        "avg": true,
+        "current": true,
+        "hideEmpty": false,
+        "hideZero": true,
+        "max": true,
+        "min": false,
+        "rightSide": false,
+        "show": true,
+        "sort": "current",
+        "sortDesc": true,
+        "total": false,
+        "values": true
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "connected",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "7.5.17",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [
+        {
+          "$$hashKey": "object:2987",
+          "alias": "MAX",
+          "dashes": true,
+          "color": "#1F60C4",
+          "fill": 0,
+          "stack": false
+        },
+        {
+          "$$hashKey": "object:78",
+          "alias": "/FINISHED|FAILED|DEAD|REMOVED|Failed Nodes:/",
+          "hiddenSeries": true
+        },
+        {
+          "$$hashKey": "object:2987",
+          "alias": "MAX + PENDING",
+          "dashes": true,
+          "color": "#777777",
+          "fill": 0,
+          "stack": false
+        }
+      ],
+      "spaceLength": 10,
+      "stack": true,
+      "steppedLine": false,
+      "targets": [
+        {
+          "exemplar": true,
+          "expr": "sum(ray_resources{Name=\"GPU\",State=\"USED\",instance=~\"$Instance\",SessionName=~\"$SessionName\"}) by (instance)",
+          "interval": "",
+          "legendFormat": "GPU Usage: {{instance}}",
+          "queryType": "randomWalk",
+          "refId": "A"
+        },
+        {
+          "exemplar": true,
+          "expr": "sum(ray_resources{Name=\"GPU\",instance=~\"$Instance\",SessionName=~\"$SessionName\"})",
+          "interval": "",
+          "legendFormat": "MAX",
+          "queryType": "randomWalk",
+          "refId": "B"
+        },
+        {
+          "exemplar": true,
+          "expr": "((sum(autoscaler_cluster_resources{resource=\"GPU\",SessionName=~\"$SessionName\"}) or vector(0)) + (sum(autoscaler_pending_resources{resource=\"GPU\",SessionName=~\"$SessionName\"}) or vector(0)) and (sum(autoscaler_cluster_resources{resource=\"GPU\",SessionName=~\"$SessionName\"}) or vector(0)) + (sum(autoscaler_pending_resources{resource=\"GPU\",SessionName=~\"$SessionName\"}) or vector(0)) > (sum(autoscaler_cluster_resources{resource=\"GPU\",SessionName=~\"$SessionName\"}) or vector(0)))",
+          "interval": "",
+          "legendFormat": "MAX + PENDING",
+          "queryType": "randomWalk",
+          "refId": "C"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Logical GPUs Usage",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "$$hashKey": "object:628",
+          "format": "GPUs",
+          "label": "",
+          "logBase": 1,
+          "max": null,
+          "min": "0",
+          "show": true
+        },
+        {
+          "$$hashKey": "object:629",
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "${datasource}",
+      "description": "Object store memory usage by instance, including memory that has been spilled to disk. The dotted line indicates the object store memory capacity. This metric can go over the max capacity in case of spillage to disk.",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 93
+      },
+      "fill": 10,
+      "fillGradient": 0,
+      "hiddenSeries": false,
+      "id": 31,
+      "legend": {
+        "alignAsTable": true,
+        "avg": true,
+        "current": true,
+        "hideEmpty": false,
+        "hideZero": true,
+        "max": true,
+        "min": false,
+        "rightSide": false,
+        "show": true,
+        "sort": "current",
+        "sortDesc": true,
+        "total": false,
+        "values": true
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "connected",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "7.5.17",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [
+        {
+          "$$hashKey": "object:2987",
+          "alias": "MAX",
+          "dashes": true,
+          "color": "#1F60C4",
+          "fill": 0,
+          "stack": false
+        },
+        {
+          "$$hashKey": "object:78",
+          "alias": "/FINISHED|FAILED|DEAD|REMOVED|Failed Nodes:/",
+          "hiddenSeries": true
+        },
+        {
+          "$$hashKey": "object:2987",
+          "alias": "MAX + PENDING",
+          "dashes": true,
+          "color": "#777777",
+          "fill": 0,
+          "stack": false
+        }
+      ],
+      "spaceLength": 10,
+      "stack": true,
+      "steppedLine": false,
+      "targets": [
+        {
+          "exemplar": true,
+          "expr": "sum(ray_object_store_memory{instance=~\"$Instance\",SessionName=~\"$SessionName\"}) by (instance)",
+          "interval": "",
+          "legendFormat": "{{instance}}",
+          "queryType": "randomWalk",
+          "refId": "A"
+        },
+        {
+          "exemplar": true,
+          "expr": "sum(ray_resources{Name=\"object_store_memory\",instance=~\"$Instance\",SessionName=~\"$SessionName\"})",
           "interval": "",
           "legendFormat": "MAX",
           "queryType": "randomWalk",
@@ -4300,7 +3274,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Object Store Memory by Location",
+      "title": "Object Store Memory Usage",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -4340,695 +3314,354 @@
       }
     },
     {
-      "collapsed": true,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 141
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "${datasource}",
+      "description": "Object store memory usage % by instance, including memory that has been spilled to disk. This metric can go over 100% in case of spillage to disk.",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
       },
-      "id": 1006,
-      "title": "TPU Utilization by Node",
-      "type": "row",
-      "panels": [
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 93
+      },
+      "fill": 0,
+      "fillGradient": 0,
+      "hiddenSeries": false,
+      "id": 32,
+      "legend": {
+        "alignAsTable": true,
+        "avg": true,
+        "current": true,
+        "hideEmpty": false,
+        "hideZero": true,
+        "max": true,
+        "min": false,
+        "rightSide": false,
+        "show": true,
+        "sort": "current",
+        "sortDesc": true,
+        "total": false,
+        "values": true
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": null,
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "7.5.17",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [
         {
-          "aliasColors": {},
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
-          "datasource": "${datasource}",
-          "description": "Percentage of tensorcore utilization for the TPUs on this node. Computed by dividing the number of tensorcore operations by the maximum supported number of operations during the sample period.",
-          "fieldConfig": {
-            "defaults": {},
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 0,
-            "y": 142
-          },
-          "fill": 10,
-          "fillGradient": 0,
-          "hiddenSeries": false,
-          "id": 50,
-          "legend": {
-            "alignAsTable": true,
-            "avg": true,
-            "current": true,
-            "hideEmpty": false,
-            "hideZero": true,
-            "max": true,
-            "min": false,
-            "rightSide": false,
-            "show": true,
-            "sort": "current",
-            "sortDesc": true,
-            "total": false,
-            "values": true
-          },
-          "lines": true,
-          "linewidth": 1,
-          "nullPointMode": "connected",
-          "options": {
-            "alertThreshold": true
-          },
-          "percentage": false,
-          "pluginVersion": "7.5.17",
-          "pointradius": 2,
-          "points": false,
-          "renderer": "flot",
-          "seriesOverrides": [
-            {
-              "$$hashKey": "object:2987",
-              "alias": "MAX",
-              "dashes": true,
-              "color": "#1F60C4",
-              "fill": 0,
-              "stack": false
-            },
-            {
-              "$$hashKey": "object:78",
-              "alias": "/FINISHED|FAILED|DEAD|REMOVED|Failed Nodes:/",
-              "hiddenSeries": true
-            },
-            {
-              "$$hashKey": "object:2987",
-              "alias": "MAX + PENDING",
-              "dashes": true,
-              "color": "#777777",
-              "fill": 0,
-              "stack": false
-            }
-          ],
-          "spaceLength": 10,
-          "stack": true,
-          "steppedLine": false,
-          "targets": [
-            {
-              "exemplar": true,
-              "expr": "sum(ray_tpu_tensorcore_utilization{instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (instance, TpuIndex, TpuDeviceName, TpuType, TpuTopology)",
-              "interval": "",
-              "legendFormat": "{{instance}}, tpu.{{TpuIndex}}, {{TpuType}}, {{TpuTopology}}",
-              "queryType": "randomWalk",
-              "refId": "A"
-            }
-          ],
-          "thresholds": [],
-          "timeFrom": null,
-          "timeRegions": [],
-          "timeShift": null,
-          "title": "Node TPU Tensorcore Utilization %",
-          "tooltip": {
-            "shared": true,
-            "sort": 0,
-            "value_type": "individual"
-          },
-          "type": "graph",
-          "xaxis": {
-            "buckets": null,
-            "mode": "time",
-            "name": null,
-            "show": true,
-            "values": []
-          },
-          "yaxes": [
-            {
-              "$$hashKey": "object:628",
-              "format": "%",
-              "label": "",
-              "logBase": 1,
-              "max": null,
-              "min": "0",
-              "show": true
-            },
-            {
-              "$$hashKey": "object:629",
-              "format": "short",
-              "label": null,
-              "logBase": 1,
-              "max": null,
-              "min": null,
-              "show": true
-            }
-          ],
-          "yaxis": {
-            "align": false,
-            "alignLevel": null
-          }
+          "$$hashKey": "object:2987",
+          "alias": "MAX",
+          "dashes": true,
+          "color": "#1F60C4",
+          "fill": 0,
+          "stack": false
         },
         {
-          "aliasColors": {},
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
-          "datasource": "${datasource}",
-          "description": "Percentage of bandwidth memory utilization for the TPUs on this node. Computed by dividing the memory bandwidth used by the maximum supported memory bandwidth limit during the sample period.",
-          "fieldConfig": {
-            "defaults": {},
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 12,
-            "y": 142
-          },
-          "fill": 10,
-          "fillGradient": 0,
-          "hiddenSeries": false,
-          "id": 51,
-          "legend": {
-            "alignAsTable": true,
-            "avg": true,
-            "current": true,
-            "hideEmpty": false,
-            "hideZero": true,
-            "max": true,
-            "min": false,
-            "rightSide": false,
-            "show": true,
-            "sort": "current",
-            "sortDesc": true,
-            "total": false,
-            "values": true
-          },
-          "lines": true,
-          "linewidth": 1,
-          "nullPointMode": "connected",
-          "options": {
-            "alertThreshold": true
-          },
-          "percentage": false,
-          "pluginVersion": "7.5.17",
-          "pointradius": 2,
-          "points": false,
-          "renderer": "flot",
-          "seriesOverrides": [
-            {
-              "$$hashKey": "object:2987",
-              "alias": "MAX",
-              "dashes": true,
-              "color": "#1F60C4",
-              "fill": 0,
-              "stack": false
-            },
-            {
-              "$$hashKey": "object:78",
-              "alias": "/FINISHED|FAILED|DEAD|REMOVED|Failed Nodes:/",
-              "hiddenSeries": true
-            },
-            {
-              "$$hashKey": "object:2987",
-              "alias": "MAX + PENDING",
-              "dashes": true,
-              "color": "#777777",
-              "fill": 0,
-              "stack": false
-            }
-          ],
-          "spaceLength": 10,
-          "stack": true,
-          "steppedLine": false,
-          "targets": [
-            {
-              "exemplar": true,
-              "expr": "sum(ray_tpu_memory_bandwidth_utilization{instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (instance, TpuIndex, TpuDeviceName, TpuType, TpuTopology)",
-              "interval": "",
-              "legendFormat": "{{instance}}, tpu.{{TpuIndex}}, {{TpuType}}, {{TpuTopology}}",
-              "queryType": "randomWalk",
-              "refId": "A"
-            }
-          ],
-          "thresholds": [],
-          "timeFrom": null,
-          "timeRegions": [],
-          "timeShift": null,
-          "title": "Node TPU High Bandwidth Memory Utilization %",
-          "tooltip": {
-            "shared": true,
-            "sort": 0,
-            "value_type": "individual"
-          },
-          "type": "graph",
-          "xaxis": {
-            "buckets": null,
-            "mode": "time",
-            "name": null,
-            "show": true,
-            "values": []
-          },
-          "yaxes": [
-            {
-              "$$hashKey": "object:628",
-              "format": "%",
-              "label": "",
-              "logBase": 1,
-              "max": null,
-              "min": "0",
-              "show": true
-            },
-            {
-              "$$hashKey": "object:629",
-              "format": "short",
-              "label": null,
-              "logBase": 1,
-              "max": null,
-              "min": null,
-              "show": true
-            }
-          ],
-          "yaxis": {
-            "align": false,
-            "alignLevel": null
-          }
+          "$$hashKey": "object:78",
+          "alias": "/FINISHED|FAILED|DEAD|REMOVED|Failed Nodes:/",
+          "hiddenSeries": true
         },
         {
-          "aliasColors": {},
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
-          "datasource": "${datasource}",
-          "description": "Percentage of time over the sample period during which the TPU is actively processing.",
-          "fieldConfig": {
-            "defaults": {},
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 0,
-            "y": 150
-          },
-          "fill": 10,
-          "fillGradient": 0,
-          "hiddenSeries": false,
-          "id": 52,
-          "legend": {
-            "alignAsTable": true,
-            "avg": true,
-            "current": true,
-            "hideEmpty": false,
-            "hideZero": true,
-            "max": true,
-            "min": false,
-            "rightSide": false,
-            "show": true,
-            "sort": "current",
-            "sortDesc": true,
-            "total": false,
-            "values": true
-          },
-          "lines": true,
-          "linewidth": 1,
-          "nullPointMode": "connected",
-          "options": {
-            "alertThreshold": true
-          },
-          "percentage": false,
-          "pluginVersion": "7.5.17",
-          "pointradius": 2,
-          "points": false,
-          "renderer": "flot",
-          "seriesOverrides": [
-            {
-              "$$hashKey": "object:2987",
-              "alias": "MAX",
-              "dashes": true,
-              "color": "#1F60C4",
-              "fill": 0,
-              "stack": false
-            },
-            {
-              "$$hashKey": "object:78",
-              "alias": "/FINISHED|FAILED|DEAD|REMOVED|Failed Nodes:/",
-              "hiddenSeries": true
-            },
-            {
-              "$$hashKey": "object:2987",
-              "alias": "MAX + PENDING",
-              "dashes": true,
-              "color": "#777777",
-              "fill": 0,
-              "stack": false
-            }
-          ],
-          "spaceLength": 10,
-          "stack": true,
-          "steppedLine": false,
-          "targets": [
-            {
-              "exemplar": true,
-              "expr": "sum(ray_tpu_duty_cycle{instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (instance, TpuIndex, TpuDeviceName, TpuType, TpuTopology) or vector(0)",
-              "interval": "",
-              "legendFormat": "{{instance}}, tpu.{{TpuIndex}}, {{TpuType}}, {{TpuTopology}}",
-              "queryType": "randomWalk",
-              "refId": "A"
-            }
-          ],
-          "thresholds": [],
-          "timeFrom": null,
-          "timeRegions": [],
-          "timeShift": null,
-          "title": "Node TPU Duty Cycle %",
-          "tooltip": {
-            "shared": true,
-            "sort": 0,
-            "value_type": "individual"
-          },
-          "type": "graph",
-          "xaxis": {
-            "buckets": null,
-            "mode": "time",
-            "name": null,
-            "show": true,
-            "values": []
-          },
-          "yaxes": [
-            {
-              "$$hashKey": "object:628",
-              "format": "%",
-              "label": "",
-              "logBase": 1,
-              "max": null,
-              "min": "0",
-              "show": true
-            },
-            {
-              "$$hashKey": "object:629",
-              "format": "short",
-              "label": null,
-              "logBase": 1,
-              "max": null,
-              "min": null,
-              "show": true
-            }
-          ],
-          "yaxis": {
-            "align": false,
-            "alignLevel": null
-          }
-        },
-        {
-          "aliasColors": {},
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
-          "datasource": "${datasource}",
-          "description": "Total memory used/allocated for the TPUs on this node.",
-          "fieldConfig": {
-            "defaults": {},
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 12,
-            "y": 150
-          },
-          "fill": 10,
-          "fillGradient": 0,
-          "hiddenSeries": false,
-          "id": 53,
-          "legend": {
-            "alignAsTable": true,
-            "avg": true,
-            "current": true,
-            "hideEmpty": false,
-            "hideZero": true,
-            "max": true,
-            "min": false,
-            "rightSide": false,
-            "show": true,
-            "sort": "current",
-            "sortDesc": true,
-            "total": false,
-            "values": true
-          },
-          "lines": true,
-          "linewidth": 1,
-          "nullPointMode": "connected",
-          "options": {
-            "alertThreshold": true
-          },
-          "percentage": false,
-          "pluginVersion": "7.5.17",
-          "pointradius": 2,
-          "points": false,
-          "renderer": "flot",
-          "seriesOverrides": [
-            {
-              "$$hashKey": "object:2987",
-              "alias": "MAX",
-              "dashes": true,
-              "color": "#1F60C4",
-              "fill": 0,
-              "stack": false
-            },
-            {
-              "$$hashKey": "object:78",
-              "alias": "/FINISHED|FAILED|DEAD|REMOVED|Failed Nodes:/",
-              "hiddenSeries": true
-            },
-            {
-              "$$hashKey": "object:2987",
-              "alias": "MAX + PENDING",
-              "dashes": true,
-              "color": "#777777",
-              "fill": 0,
-              "stack": false
-            }
-          ],
-          "spaceLength": 10,
-          "stack": true,
-          "steppedLine": false,
-          "targets": [
-            {
-              "exemplar": true,
-              "expr": "sum(ray_tpu_memory_used{instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (instance, TpuIndex, TpuDeviceName, TpuType, TpuTopology) or vector(0)",
-              "interval": "",
-              "legendFormat": "Memory Used: {{instance}}, tpu.{{TpuIndex}}, {{TpuType}}, {{TpuTopology}}",
-              "queryType": "randomWalk",
-              "refId": "A"
-            },
-            {
-              "exemplar": true,
-              "expr": "sum(ray_tpu_memory_total{instance=~\"$Instance\",SessionName=~\"$SessionName\",ray_io_cluster=~\"$Cluster\"}) by (instance, TpuIndex, TpuDeviceName, TpuType, TpuTopology) or vector(0)",
-              "interval": "",
-              "legendFormat": "Memory Total: {{instance}}, tpu.{{TpuIndex}}, {{TpuType}}, {{TpuTopology}}",
-              "queryType": "randomWalk",
-              "refId": "B"
-            }
-          ],
-          "thresholds": [],
-          "timeFrom": null,
-          "timeRegions": [],
-          "timeShift": null,
-          "title": "Node TPU Memory Used",
-          "tooltip": {
-            "shared": true,
-            "sort": 0,
-            "value_type": "individual"
-          },
-          "type": "graph",
-          "xaxis": {
-            "buckets": null,
-            "mode": "time",
-            "name": null,
-            "show": true,
-            "values": []
-          },
-          "yaxes": [
-            {
-              "$$hashKey": "object:628",
-              "format": "bytes",
-              "label": "",
-              "logBase": 1,
-              "max": null,
-              "min": "0",
-              "show": true
-            },
-            {
-              "$$hashKey": "object:629",
-              "format": "short",
-              "label": null,
-              "logBase": 1,
-              "max": null,
-              "min": null,
-              "show": true
-            }
-          ],
-          "yaxis": {
-            "align": false,
-            "alignLevel": null
-          }
+          "$$hashKey": "object:2987",
+          "alias": "MAX + PENDING",
+          "dashes": true,
+          "color": "#777777",
+          "fill": 0,
+          "stack": false
         }
-      ]
+      ],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "exemplar": true,
+          "expr": "sum(ray_object_store_memory{instance=~\"$Instance\",SessionName=~\"$SessionName\"}) by (instance) * 100 / sum(ray_resources{Name=\"object_store_memory\",instance=~\"$Instance\",SessionName=~\"$SessionName\"}) by (instance)",
+          "interval": "",
+          "legendFormat": "{{instance}}",
+          "queryType": "randomWalk",
+          "refId": "A"
+        },
+        {
+          "exemplar": true,
+          "expr": "100",
+          "interval": "",
+          "legendFormat": "MAX",
+          "queryType": "randomWalk",
+          "refId": "B"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Object Store Memory Usage %",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "$$hashKey": "object:628",
+          "format": "%",
+          "label": "",
+          "logBase": 1,
+          "max": null,
+          "min": "0",
+          "show": true
+        },
+        {
+          "$$hashKey": "object:629",
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
     }
   ],
-  "refresh": false,
-  "schemaVersion": 27,
-  "style": "dark",
-  "tags": [
-    "rayVersion:2.52.1"
-  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "tags": ["ray", "sagemaker", "training"],
   "templating": {
     "list": [
       {
         "current": {
-          "selected": false
+          "selected": false,
+          "text": "default",
+          "value": "default"
         },
-        "description": "Filter queries of a specific Prometheus type.",
-        "hide": 2,
+        "hide": 0,
         "includeAll": false,
         "multi": false,
         "name": "datasource",
         "options": [],
         "query": "prometheus",
+        "queryValue": "",
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
         "type": "datasource"
       },
       {
-        "allValue": ".+",
         "current": {
-          "selected": false
+          "selected": false,
+          "text": "All",
+          "value": "$__all"
         },
-        "datasource": "${datasource}",
-        "definition": "label_values(ray_node_network_receive_speed{}, SessionName)",
-        "description": "Filter queries to specific Ray sessions.",
-        "error": null,
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(ray_node_cpu_utilization{}, SessionName)",
         "hide": 0,
         "includeAll": true,
-        "label": null,
-        "multi": false,
+        "multi": true,
         "name": "SessionName",
         "options": [],
         "query": {
-          "query": "label_values(ray_node_network_receive_speed{}, SessionName)",
+          "query": "label_values(ray_node_cpu_utilization{}, SessionName)",
           "refId": "StandardVariableQuery"
         },
-        "refresh": 1,
+        "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
         "sort": 2,
-        "tagValuesQuery": "",
-        "tags": [],
-        "tagsQuery": "",
-        "type": "query",
-        "useTags": false
+        "type": "query"
       },
       {
-        "allValue": ".+",
         "current": {
-          "selected": true,
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
+          "selected": false,
+          "text": "All",
+          "value": "$__all"
         },
-        "datasource": "${datasource}",
-        "definition": "label_values(ray_node_network_receive_speed{SessionName=~\"$SessionName\",}, instance)",
-        "description": "Filter queries to specific Ray nodes by their IP address.",
-        "error": null,
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(ray_node_cpu_utilization{SessionName=~\"$SessionName\"}, instance)",
         "hide": 0,
         "includeAll": true,
-        "label": null,
         "multi": true,
         "name": "Instance",
         "options": [],
         "query": {
-          "query": "label_values(ray_node_network_receive_speed{SessionName=~\"$SessionName\",}, instance)",
-          "refId": "Prometheus-Instance-Variable-Query"
+          "query": "label_values(ray_node_cpu_utilization{SessionName=~\"$SessionName\"}, instance)",
+          "refId": "StandardVariableQuery"
         },
-        "refresh": 1,
+        "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
         "sort": 0,
-        "tagValuesQuery": "",
-        "tags": [],
-        "tagsQuery": "",
-        "type": "query",
-        "useTags": false
+        "type": "query"
       },
       {
-        "allValue": ".*",
         "current": {
-          "selected": false
+          "selected": false,
+          "text": "All",
+          "value": "$__all"
         },
-        "datasource": "${datasource}",
-        "definition": "label_values(ray_node_network_receive_speed{}, ray_io_cluster)",
-        "description": "Filter queries to specific Ray clusters for KubeRay. When ingesting metrics across multiple Ray clusters, the ray_io_cluster label should be set per cluster. For KubeRay users, this is done automatically with Prometheus PodMonitor.",
-        "error": null,
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(ray_train_worker_group_start_total_time_s{SessionName=~\"$SessionName\"}, ray_train_run_name)",
         "hide": 0,
         "includeAll": true,
-        "label": null,
-        "multi": false,
-        "name": "Cluster",
+        "multi": true,
+        "name": "TrainRunName",
         "options": [],
         "query": {
-          "query": "label_values(ray_node_network_receive_speed{}, ray_io_cluster)",
+          "query": "label_values(ray_train_worker_group_start_total_time_s{SessionName=~\"$SessionName\"}, ray_train_run_name)",
           "refId": "StandardVariableQuery"
         },
-        "refresh": 1,
+        "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
-        "sort": 2,
-        "tagValuesQuery": "",
-        "tags": [],
-        "tagsQuery": "",
-        "type": "query",
-        "useTags": false
+        "sort": 0,
+        "type": "query"
       },
       {
         "current": {
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
+          "selected": false,
+          "text": "All",
+          "value": "$__all"
         },
-        "description": "Filter queries to specific Ray node types (head or worker).",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(ray_node_cpu_utilization{SessionName=~\"$SessionName\"}, RayNodeType)",
+        "hide": 0,
         "includeAll": true,
         "multi": true,
         "name": "RayNodeType",
-        "options": [
-          {
-            "selected": false,
-            "text": "All",
-            "value": "$__all"
-          },
-          {
-            "selected": false,
-            "text": "Head Node",
-            "value": "head"
-          },
-          {
-            "selected": false,
-            "text": "Worker Node",
-            "value": "worker"
-          }
-        ],
-        "query": "head, worker",
-        "type": "custom"
+        "options": [],
+        "query": {
+          "query": "label_values(ray_node_cpu_utilization{SessionName=~\"$SessionName\"}, RayNodeType)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(ray_train_controller_state{SessionName=~\"$SessionName\"}, ray_train_run_id)",
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "name": "TrainRunId",
+        "options": [],
+        "query": {
+          "query": "label_values(ray_train_controller_state{SessionName=~\"$SessionName\"}, ray_train_run_id)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(ray_train_report_total_blocked_time_s{SessionName=~\"$SessionName\"}, ray_train_worker_world_rank)",
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "name": "TrainWorkerWorldRank",
+        "options": [],
+        "query": {
+          "query": "label_values(ray_train_report_total_blocked_time_s{SessionName=~\"$SessionName\"}, ray_train_worker_world_rank)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(ray_train_report_total_blocked_time_s{SessionName=~\"$SessionName\"}, ray_train_worker_actor_id)",
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "name": "TrainWorkerActorId",
+        "options": [],
+        "query": {
+          "query": "label_values(ray_train_report_total_blocked_time_s{SessionName=~\"$SessionName\"}, ray_train_worker_actor_id)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
       }
     ]
   },
-  "rayMeta": [
-    "supportsFullGrafanaView",
-    "supportsGlobalFilterOverride"
-  ],
   "time": {
-    "from": "now-30m",
+    "from": "now-1h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
-  "title": "Default Dashboard",
-  "uid": "rayDefaultDashboard",
-  "version": 4
+  "title": "Ray SageMaker Training Job",
+  "uid": null,
+  "version": 0
 }
