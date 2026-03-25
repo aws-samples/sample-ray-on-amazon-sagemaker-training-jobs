@@ -140,19 +140,19 @@ The `launcher.py` script requires specific parameters to execute your custom tra
 
 All parameters above can also be set as environment variables via the `environment` dict in your ModelTrainer or Estimator configuration. Environment variables are used as fallback when the corresponding command line argument is not provided.
 
-| Variable                               | Type   | Required | Description                                                                                                                                                             |
-| -------------------------------------- | ------ | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `head_instance_group`                  | string | No       | Alternative way to set head instance group name (heterogeneous clusters only)                                                                                           |
-| `head_num_cpus`                        | int    | No       | Alternative way to set number of CPUs reserved for head node                                                                                                            |
-| `head_num_gpus`                        | int    | No       | Alternative way to set number of GPUs reserved for head node                                                                                                            |
-| `launch_prometheus`                    | bool   | No       | Alternative way to enable/disable local Prometheus on the head node (default: true). Internet connectivity required                                                     |
-| `prometheus_path`                      | string | No       | Path to prometheus binary if provided as InputData                                                                                                                      |
-| `wait_shutdown`                        | int    | No       | Alternative way to set shutdown wait time                                                                                                                               |
-| `RAY_PROMETHEUS_HOST`                  | string | No       | Prometheus host URL. When set to a remote URL (not localhost), enables remote_write from local Prometheus to the remote endpoint. For AMP URLs, SigV4 auth is automatic |
-| `RAY_PROMETHEUS_NAME`                  | string | No       | Prometheus data source name in Grafana (default: `Prometheus`). Used by the Ray Dashboard for Grafana integration                                                       |
-| `RAY_GRAFANA_HOST`                     | string | No       | Grafana server URL. Used by Ray Dashboard for server-side API calls and browser-side iframe embedding                                                                   |
-| `RAY_PROMETHEUS_REMOTE_WRITE_USERNAME` | string | No       | Username for basic auth when remote writing to a self-hosted Prometheus server                                                                                          |
-| `RAY_PROMETHEUS_REMOTE_WRITE_PASSWORD` | string | No       | Password for basic auth when remote writing to a self-hosted Prometheus server                                                                                          |
+| Variable                  | Type   | Required | Description                                                                                                                                                             |
+| ------------------------- | ------ | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `head_instance_group`     | string | No       | Alternative way to set head instance group name (heterogeneous clusters only)                                                                                           |
+| `head_num_cpus`           | int    | No       | Alternative way to set number of CPUs reserved for head node                                                                                                            |
+| `head_num_gpus`           | int    | No       | Alternative way to set number of GPUs reserved for head node                                                                                                            |
+| `launch_prometheus`       | bool   | No       | Alternative way to enable/disable local Prometheus on the head node (default: true). Internet connectivity required                                                     |
+| `prometheus_path`         | string | No       | Path to prometheus binary if provided as InputData                                                                                                                      |
+| `wait_shutdown`           | int    | No       | Alternative way to set shutdown wait time                                                                                                                               |
+| `RAY_PROMETHEUS_HOST`     | string | No       | Prometheus host URL. When set to a remote URL (not localhost), enables remote_write from local Prometheus to the remote endpoint. For AMP URLs, SigV4 auth is automatic |
+| `RAY_PROMETHEUS_NAME`     | string | No       | Prometheus data source name in Grafana (default: `Prometheus`). Used by the Ray Dashboard for Grafana integration                                                       |
+| `RAY_GRAFANA_HOST`        | string | No       | Grafana server URL. Used by Ray Dashboard for server-side API calls and browser-side iframe embedding                                                                   |
+| `RAY_PROMETHEUS_USERNAME` | string | No       | Username for basic auth when remote writing to a self-hosted Prometheus server                                                                                          |
+| `RAY_PROMETHEUS_PASSWORD` | string | No       | Password for basic auth when remote writing to a self-hosted Prometheus server                                                                                          |
 
 ### Script definition
 
@@ -511,8 +511,8 @@ model_trainer = ModelTrainer(
     source_code=source_code,
     environment={
         "RAY_PROMETHEUS_HOST": "https://my-prometheus-server.example.com",
-        "RAY_PROMETHEUS_REMOTE_WRITE_USERNAME": "myuser",
-        "RAY_PROMETHEUS_REMOTE_WRITE_PASSWORD": "mypassword",
+        "RAY_PROMETHEUS_USERNAME": "myuser",
+        "RAY_PROMETHEUS_PASSWORD": "mypassword",
     },
     ...
 )
