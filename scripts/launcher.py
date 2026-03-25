@@ -1294,8 +1294,11 @@ def _setup_head_node(
             # Inject remote_write config BEFORE launching Prometheus so the
             # process starts with the correct configuration already in place.
             if remote_host:
-                remote_write_url = f"{remote_host}/api/v1/remote_write"
                 region = _extract_amp_region(remote_host)
+                # AMP uses /api/v1/remote_write; self-hosted Prometheus
+                # (with --web.enable-remote-write-receiver) uses /api/v1/write
+                rw_path = "/api/v1/remote_write" if region else "/api/v1/write"
+                remote_write_url = f"{remote_host}{rw_path}"
                 # ray metrics launch-prometheus reads the Ray package template;
                 # custom Prometheus uses the session config.
                 config_path = _get_prometheus_config_path(
@@ -1594,8 +1597,9 @@ def _setup_single_node_ray(
             remote_host = runtime_env.get("RAY_REMOTE_WRITE_PROMETHEUS_HOST")
 
             if remote_host:
-                remote_write_url = f"{remote_host}/api/v1/remote_write"
                 region = _extract_amp_region(remote_host)
+                rw_path = "/api/v1/remote_write" if region else "/api/v1/write"
+                remote_write_url = f"{remote_host}{rw_path}"
                 config_path = _get_prometheus_config_path(
                     use_ray_template=not use_custom_prometheus
                 )
