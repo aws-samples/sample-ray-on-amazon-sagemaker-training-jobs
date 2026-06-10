@@ -1418,7 +1418,15 @@ def _setup_head_node(
 
             time.sleep(1)
             resources = ray.available_resources().keys()
-            curr_nodes = [r for r in resources if r.startswith("node:")]
+            # Ray exposes a synthetic "node:__internal_head__" resource in
+            # addition to the per-node "node:<ip>" entries; excluding it keeps
+            # the count equal to the real number of nodes, otherwise the head is
+            # counted twice and the loop exits one worker early.
+            curr_nodes = [
+                r
+                for r in resources
+                if r.startswith("node:") and r != "node:__internal_head__"
+            ]
             connected_nodes = len(curr_nodes)
 
             if connected_nodes < cluster_size and (time.time() - start_time) % 30 < 1:
