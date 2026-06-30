@@ -11,6 +11,7 @@ This repository demonstrates how to use Ray for distributed data processing and 
   - [Required Parameters and Environment Variables](#required-parameters-and-environment-variables)
     - [Parameter Reference](#parameter-reference)
     - [Environment Variables Reference](#environment-variables-reference)
+  - [EFA / RDMA networking](#efa--rdma-networking)
   - [Script definition](#script-definition)
 - [Examples](#examples)
 - [Example Usage](#example-usage)
@@ -153,6 +154,43 @@ All parameters above can also be set as environment variables via the `environme
 | `RAY_GRAFANA_HOST`        | string | No       | Grafana server URL. Used by Ray Dashboard for server-side API calls and browser-side iframe embedding                                                                   |
 | `RAY_PROMETHEUS_USERNAME` | string | No       | Username for basic auth when remote writing to a self-hosted Prometheus server                                                                                          |
 | `RAY_PROMETHEUS_PASSWORD` | string | No       | Password for basic auth when remote writing to a self-hosted Prometheus server                                                                                          |
+| `FI_PROVIDER`             | string | No       | libfabric provider for EFA networking. Leave unset to let the launcher autodetect (see [EFA / RDMA networking](#efa--rdma-networking)). Set explicitly to override      |
+| `FI_EFA_USE_DEVICE_RDMA`  | string | No       | Enable EFA's RDMA transport (`"1"`). Leave unset for autodetection; set explicitly to override                                                                          |
+| `RDMAV_FORK_SAFE`         | string | No       | Make RDMA fork-safe (`"1"`). Leave unset for autodetection; set explicitly to override                                                                                  |
+
+### EFA / RDMA networking
+
+EFA (Elastic Fabric Adapter) accelerates inter-node communication on supported GPU
+instances. **By default you do not need to configure anything** — the launcher detects
+whether an EFA device is actually attached to each node and enables it only when present:
+
+- If the instance type is EFA-capable **and** an EFA device is detected, the launcher sets
+  `FI_PROVIDER=efa` (and, on RDMA-capable types such as p4d/p4de/trn1,
+  `FI_EFA_USE_DEVICE_RDMA=1` and `RDMAV_FORK_SAFE=1`).
+- If no EFA device is present (for example a coordinator-only head node), the launcher leaves
+  these unset so libfabric is never pointed at a device that does not exist.
+
+Detection uses `fi_info -p efa` (with a sysfs fallback). This per-device check is more robust
+than keying off the instance type alone, because an EFA-capable instance does not always have
+an EFA device attached for every job.
+
+**Overriding the autodetection.** Any of these variables set in the ModelTrainer `environment`
+dict always takes precedence over autodetection:
+
+```python
+model_trainer = ModelTrainer(
+    ...
+    environment={
+        "FI_PROVIDER": "efa",   # force EFA on, or set "tcp" to force it off
+    },
+)
+```
+
+> **Note:** Forcing `FI_PROVIDER=efa` applies it to every node, including any without an EFA
+> device. This is harmless for communication-light workloads (e.g. `ray.data` batch inference)
+> but can cause libfabric/NCCL initialization errors for collective workloads (e.g. distributed
+> training) on a node where EFA is not actually attached. Setting `FI_PROVIDER=tcp` is a safe
+> way to disable EFA entirely (e.g. for debugging).
 
 ### Script definition
 

@@ -648,6 +648,43 @@ def _inject_remote_write_config(
         raise
 
 
+def _is_efa_device_present() -> bool:
+    """Return True only if an EFA device is actually attached to THIS node.
+
+    Instance-type capability (membership in SM_EFA_NCCL_INSTANCES) only tells us
+    whether the type *can* have EFA, not whether EFA is actually attached for
+    this job. The two can differ (e.g. a coordinator node, or topologies where
+    SageMaker does not attach EFA), so we confirm against the real device.
+
+    Detection order (first reliable signal wins):
+      1. `fi_info -p efa` — authoritative: returns 0 only when libfabric can
+         actually open the EFA provider. This is exactly the condition
+         FI_PROVIDER=efa relies on.
+      2. sysfs / device node fallback, used only if `fi_info` is unavailable.
+    """
+    try:
+        result = subprocess.run(
+            ["fi_info", "-p", "efa"],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        return result.returncode == 0
+    except FileNotFoundError:
+        # fi_info not on PATH — fall back to inspecting the RDMA device tree.
+        logger.info("fi_info not found; falling back to sysfs EFA detection")
+    except Exception as e:  # noqa: BLE001
+        logger.warning("EFA detection via fi_info failed (%s); using sysfs fallback", e)
+
+    try:
+        return any(os.scandir("/sys/class/infiniband"))
+    except FileNotFoundError:
+        return False
+    except Exception as e:  # noqa: BLE001
+        logger.warning("EFA sysfs detection failed: %s", e)
+        return False
+
+
 def _create_runtime_environment(args: argparse.Namespace, env: Any) -> Dict[str, Any]:
     """
     Create the Ray runtime environment configuration based on instance type.
@@ -685,14 +722,38 @@ def _create_runtime_environment(args: argparse.Namespace, env: Any) -> Dict[str,
         }
     )
 
-    # Configure EFA if supported by the instance type
-    if env.current_instance_type in SM_EFA_NCCL_INSTANCES:
-        runtime_env["FI_PROVIDER"] = "efa"
+    # Configure EFA/RDMA based on ACTUAL device presence, not just instance-type
+    # capability. An instance type can be EFA-capable yet have no EFA device
+    # attached for a given job (e.g. a coordinator-only head, or topologies where
+    # SageMaker does not attach EFA). Forcing FI_PROVIDER=efa on such a node
+    # points libfabric at a device that does not exist. We therefore require both
+    # that the type is EFA-capable AND that an EFA device is actually present.
+    #
+    # An explicit value supplied via the ModelTrainer `environment` dict always
+    # wins, so users can override the autodetection when they know better.
+    efa_capable = env.current_instance_type in SM_EFA_NCCL_INSTANCES
+    rdma_capable = env.current_instance_type in SM_EFA_RDMA_INSTANCES
+    efa_present = _is_efa_device_present() if (efa_capable or rdma_capable) else False
 
-    # Configure RDMA if supported by the instance type
-    if env.current_instance_type in SM_EFA_RDMA_INSTANCES:
-        runtime_env["FI_EFA_USE_DEVICE_RDMA"] = "1"
-        runtime_env["RDMAV_FORK_SAFE"] = "1"
+    if "FI_PROVIDER" in os.environ:
+        logger.info(
+            "FI_PROVIDER set from environment: %s", os.environ["FI_PROVIDER"]
+        )
+    elif efa_capable and efa_present:
+        runtime_env["FI_PROVIDER"] = "efa"
+        logger.info("EFA device detected; setting FI_PROVIDER=efa")
+    elif efa_capable:
+        logger.info(
+            "Instance type %s is EFA-capable but no EFA device detected; "
+            "not setting FI_PROVIDER",
+            env.current_instance_type,
+        )
+
+    if rdma_capable and efa_present:
+        if "FI_EFA_USE_DEVICE_RDMA" not in os.environ:
+            runtime_env["FI_EFA_USE_DEVICE_RDMA"] = "1"
+        if "RDMAV_FORK_SAFE" not in os.environ:
+            runtime_env["RDMAV_FORK_SAFE"] = "1"
 
     if args.launch_prometheus:
         # Configure Prometheus host - Ray Dashboard connects to local Prometheus
