@@ -1,5 +1,6 @@
 from accelerate import Accelerator
 import base64
+import dataclasses
 from dataclasses import dataclass, field
 from datasets import Dataset, DatasetDict, load_dataset, load_from_disk
 import datetime
@@ -1705,31 +1706,66 @@ def prepare_dataset(
     return train_ds, test_ds
 
 
+def _restore_dataclass_missing_sentinels(cls) -> None:
+    """Re-point a dataclass's MISSING default sentinels to dataclasses.MISSING.
+
+    Ray ships train_func to the workers with cloudpickle, which serializes
+    ScriptArguments (defined in __main__) BY VALUE. The dataclasses.MISSING
+    singleton does not survive that round-trip: each field that had no default
+    comes back with a *fresh* _MISSING_TYPE instance, so HfArgumentParser's
+    ``field.default_factory is not MISSING`` identity check is fooled into calling
+    the sentinel as a factory -> ``TypeError: '_MISSING_TYPE' object is not
+    callable``. Reassigning any field whose default/default_factory is a
+    _MISSING_TYPE (by type, since identity is broken) back to the canonical
+    dataclasses.MISSING restores the identity check. No-op when identities are
+    already intact (e.g. running without Ray).
+    """
+    missing_type = type(dataclasses.MISSING)
+    for f in dataclasses.fields(cls):
+        if isinstance(f.default, missing_type):
+            f.default = dataclasses.MISSING
+        if isinstance(f.default_factory, missing_type):
+            f.default_factory = dataclasses.MISSING
+
+
 def train_func(config):
     """Ray Train worker function.
 
-    Runs once per Ray Train worker. ``config`` carries the ``script_args`` and
-    ``training_args`` (an ``SFTConfig``) constructed in ``main()`` on the driver.
+    Runs once per Ray Train worker (a GPU node). Parsing of the training config
+    is done HERE, not on the driver: the Ray head can be a CPU-only coordinator
+    (e.g. ml.t3.2xlarge with head_num_gpus=0), and constructing SFTConfig there
+    would trip transformers' bf16/gpu validation ("Your setup doesn't support
+    bf16/gpu") before any GPU worker runs. Parsing inside the worker also means
+    SFTConfig.__post_init__ sees the torch.distributed process group Ray has
+    already initialized, so FSDP/DeepSpeed are detected correctly.
 
     Args:
-        config: dict with "script_args" and "training_args".
+        config: dict with "config_path" — the path to the --config YAML, which is
+            available on every node (SageMaker replicates the config channel).
     """
-    import dataclasses
+    # hf_transfer speeds up the snapshot download below; set it in the worker
+    # process (env set on the head does not reliably propagate to Ray workers).
+    set_custom_env({"HF_HUB_ENABLE_HF_TRANSFER": "1"})
 
-    script_args = config["script_args"]
+    # cloudpickle broke the dataclasses.MISSING identity on ScriptArguments when
+    # Ray shipped this function to the worker; repair it before HfArgumentParser
+    # inspects the fields (see _restore_dataclass_missing_sentinels).
+    _restore_dataclass_missing_sentinels(ScriptArguments)
 
-    # Re-create SFTConfig to pick up the worker's distributed state.
-    # Ray pickles the object from main() without calling __post_init__ on restore,
-    # so the internal PartialState still reflects the non-distributed driver process.
-    # This re-creation triggers __post_init__ which detects torch.distributed
-    # (initialized by Ray) and enables FSDP/DeepSpeed.
-    training_args = SFTConfig(
-        **{
-            f.name: getattr(config["training_args"], f.name)
-            for f in dataclasses.fields(config["training_args"])
-            if f.init
-        }
+    # Parse ScriptArguments + SFTConfig from the YAML on the worker. sys.argv here
+    # is the Ray worker's, not the launcher's, so the config path is passed
+    # explicitly via train_loop_config rather than read from argv.
+    parser = TrlParser((ScriptArguments, SFTConfig))
+    parse_args = (
+        ["--config", config["config_path"]] if config.get("config_path") else None
     )
+    script_args, training_args, _ = parser.parse_args_and_config(
+        args=parse_args, return_remaining_strings=True
+    )
+
+    # Configure MLflow inside the worker (needs script_args; the run is only
+    # started on the main process further down).
+    setup_mlflow(script_args)
 
     set_seed(training_args.seed)
 
@@ -1997,22 +2033,33 @@ def setup_workers(env):
     return num_workers, num_gpus
 
 
+def _get_config_path() -> Optional[str]:
+    """Extract the --config YAML path from the launcher's argv.
+
+    Deliberately does NOT build the SFTConfig here: main() runs on the Ray head,
+    which may be a CPU-only coordinator (ml.t3.2xlarge, head_num_gpus=0). Parsing
+    SFTConfig on a GPU-less head trips transformers' bf16/gpu validation before any
+    worker starts, so config parsing is deferred to train_func on a GPU worker.
+    """
+    import argparse
+
+    cfg_parser = argparse.ArgumentParser(add_help=False, allow_abbrev=False)
+    cfg_parser.add_argument("--config", type=str, default=None)
+    known, _ = cfg_parser.parse_known_args()
+    return known.config
+
+
 def main():
-    """Main function to parse arguments and start Ray distributed training."""
-    # Parse arguments. return_remaining_strings=True tolerates launcher-injected
-    # extra args (e.g. Ray/Prometheus flags) that aren't part of the training config.
-    parser = TrlParser((ScriptArguments, SFTConfig))
-    script_args, training_args, _ = parser.parse_args_and_config(
-        return_remaining_strings=True,
-    )
+    """Main function: set up the Ray cluster and dispatch training to GPU workers.
+
+    The training config (ScriptArguments + SFTConfig) is intentionally parsed
+    inside train_func on the workers, not here — see _get_config_path().
+    """
+    config_path = _get_config_path()
 
     # Setup environment
     env = sagemaker_training.environment.Environment()
     num_workers, num_gpus = setup_workers(env)
-    set_custom_env({"HF_HUB_ENABLE_HF_TRANSFER": "1"})
-
-    # Setup MLflow on the driver (run name / experiment env vars propagate to workers)
-    setup_mlflow(script_args)
 
     # Configure and start Ray Train
     scaling_config = ray.train.ScalingConfig(
@@ -2026,7 +2073,7 @@ def main():
 
     trainer = ray.train.torch.TorchTrainer(
         train_func,
-        train_loop_config={"script_args": script_args, "training_args": training_args},
+        train_loop_config={"config_path": config_path},
         scaling_config=scaling_config,
         run_config=run_config,
     )
