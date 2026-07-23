@@ -610,6 +610,24 @@ def _inject_remote_write_config(
         with open(config_path, "r") as f:
             config = yaml.safe_load(f)
 
+        # yaml.safe_load returns None for an empty file; normalize to a dict.
+        if config is None:
+            config = {}
+
+        # Stamp the SageMaker training job name as a constant external label so
+        # every remote-written series can be filtered by it in Grafana (a
+        # "TrainingJobName" dashboard variable). Prometheus applies
+        # external_labels to all remote_write samples without overriding a
+        # series' own labels, and the name is chosen not to collide with Ray's
+        # labels. Merges with any existing global block.
+        training_job_name = os.environ.get("TRAINING_JOB_NAME")
+        if training_job_name:
+            global_cfg = config.get("global") or {}
+            external_labels = global_cfg.get("external_labels") or {}
+            external_labels["sagemaker_training_job_name"] = training_job_name
+            global_cfg["external_labels"] = external_labels
+            config["global"] = global_cfg
+
         remote_write_entry = {
             "url": remote_write_url,
             "queue_config": {
@@ -646,6 +664,105 @@ def _inject_remote_write_config(
     except Exception as e:
         logger.error("Failed to inject remote_write config: %s", e)
         raise
+
+
+def _resolve_ip_bounded(host: str, attempts: int = 3, delay: int = 2) -> Optional[str]:
+    """Best-effort host -> IP with a SHORT, bounded retry.
+
+    Deliberately NOT `_get_ip_from_host` (which retries 200x5s ~= 1000s): this
+    runs before the Prometheus launch, so it must not block the head node for
+    minutes if a worker's DNS entry lags. A node that does not resolve in time
+    is simply left unlabeled.
+    """
+    import socket
+
+    for _ in range(attempts):
+        try:
+            return socket.gethostbyname(host)
+        except OSError:
+            time.sleep(delay)
+    return None
+
+
+def _build_ip_instance_type_map(env: Any) -> Dict[str, str]:
+    """Map each node IP -> its SageMaker instance type.
+
+    The head knows the whole topology from the SageMaker environment, so it can
+    label every node's series with its instance type (which differs per node on
+    a heterogeneous cluster). Returns {ip: instance_type}; nodes that fail to
+    resolve quickly are omitted (left unlabeled).
+    """
+    mapping: Dict[str, str] = {}
+    try:
+        if getattr(env, "is_hetero", False):
+            for group in env.instance_groups_dict.values():
+                itype = group.get("instance_type") or "unknown"
+                for host in group.get("hosts", []):
+                    ip = _resolve_ip_bounded(host)
+                    if ip:
+                        mapping[ip] = itype
+                    else:
+                        logger.warning(
+                            "instance_type map: could not resolve host %s", host
+                        )
+        else:
+            itype = getattr(env, "current_instance_type", None) or "unknown"
+            for host in env.hosts:
+                ip = _resolve_ip_bounded(host)
+                if ip:
+                    mapping[ip] = itype
+                else:
+                    logger.warning("instance_type map: could not resolve host %s", host)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("Failed building IP->instance_type map: %s", e)
+    return mapping
+
+
+def _inject_instance_type_relabel(
+    config_path: Optional[str], ip_type_map: Dict[str, str]
+) -> None:
+    """Add scrape-time relabel_configs so each node's series get an instance_type label.
+
+    relabel_configs run at scrape time (before ingestion and remote_write), so
+    the added label reaches Prometheys. Each rule matches the target's __address__
+    (<ip>:<port>) and sets instance_type to the mapped value. Must run before
+    Prometheus reads its config (i.e. before launch).
+    """
+    if not ip_type_map or not config_path or not os.path.exists(config_path):
+        return
+    try:
+        with open(config_path, "r") as f:
+            config = yaml.safe_load(f) or {}
+
+        jobs = config.get("scrape_configs", [])
+        # Ray writes a single scrape job (job_name "ray"); fall back to the first.
+        ray_job = next(
+            (j for j in jobs if j.get("job_name") == "ray"),
+            jobs[0] if jobs else None,
+        )
+        if ray_job is None:
+            logger.warning("No scrape_configs found; skipping instance_type relabel")
+            return
+
+        relabels = ray_job.setdefault("relabel_configs", [])
+        for ip, itype in ip_type_map.items():
+            relabels.append(
+                {
+                    "source_labels": ["__address__"],
+                    "regex": "%s:.*" % re.escape(ip),
+                    "target_label": "instance_type",
+                    "replacement": itype,
+                }
+            )
+
+        with open(config_path, "w") as f:
+            yaml.dump(config, f, default_flow_style=False)
+
+        logger.info(
+            "Injected instance_type relabel_configs for %d node(s)", len(ip_type_map)
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.error("Failed to inject instance_type relabel: %s", e)
 
 
 def _is_efa_device_present() -> bool:
@@ -1392,6 +1509,17 @@ def _setup_head_node(
                     basic_auth=basic_auth,
                 )
 
+            # Add a per-node instance_type label via scrape-time relabeling so the
+            # dashboard can filter by instance type (e.g. ml.g4dn.12xlarge). This
+            # runs regardless of remote_write and must happen before launch, since
+            # Prometheus reads its config only at startup.
+            instance_type_config_path = _get_prometheus_config_path(
+                use_ray_template=not use_custom_prometheus
+            )
+            _inject_instance_type_relabel(
+                instance_type_config_path, _build_ip_instance_type_map(env)
+            )
+
             logger.info("Launching prometheus")
             if use_custom_prometheus:
                 prometheus_cmd = _build_prometheus_command(prometheus_folder_name)
@@ -1641,7 +1769,7 @@ def _get_heterogeneous_cluster_config(
 
 
 def _setup_single_node_ray(
-    args: argparse.Namespace, runtime_env: Dict[str, Any]
+    args: argparse.Namespace, runtime_env: Dict[str, Any], env: Any
 ) -> int:
     """
     Set up Ray for single-node execution.
@@ -1649,6 +1777,7 @@ def _setup_single_node_ray(
     Args:
         args: Command line arguments
         runtime_env: Ray runtime environment configuration
+        env: SageMaker environment variables object (for instance_type labeling)
     """
     global ray_initialized, has_failure, prometheus_folder_name
 
@@ -1697,6 +1826,16 @@ def _setup_single_node_ray(
                     config_path=config_path,
                     basic_auth=basic_auth,
                 )
+
+            # Add a per-node instance_type label via scrape-time relabeling so the
+            # dashboard can filter by instance type (single-node is homogeneous).
+            # Must happen before launch; Prometheus reads its config only at startup.
+            instance_type_config_path = _get_prometheus_config_path(
+                use_ray_template=not use_custom_prometheus
+            )
+            _inject_instance_type_relabel(
+                instance_type_config_path, _build_ip_instance_type_map(env)
+            )
 
             logger.info("Launching prometheus")
             if use_custom_prometheus:
@@ -1868,7 +2007,7 @@ def _setup_ray_environment_homogeneous_cluster(
 
     # Single-node workload scenario
     if total_host_count == 1:
-        return _setup_single_node_ray(args, runtime_env)
+        return _setup_single_node_ray(args, runtime_env, env)
 
     # Multi-node workload scenario
     return _setup_multi_node_ray(all_hosts, head_host, runtime_env, args, env)
@@ -1908,7 +2047,7 @@ def _setup_ray_environment_heterogeneous_cluster(
 
     # Single-node workload scenario
     if total_host_count == 1:
-        return _setup_single_node_ray(args, runtime_env)
+        return _setup_single_node_ray(args, runtime_env, env)
 
     # Multi-node workload scenario
     return _setup_multi_node_ray(all_hosts, head_host, runtime_env, args, env)
