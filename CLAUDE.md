@@ -18,7 +18,7 @@ dashboard) demonstrates how to use that launcher.
 ```
 scripts/
   launcher.py              # CANONICAL launcher — the single source of truth
-  requirements.txt         # ray[data,train,tune,serve]==2.54.0, sagemaker==3.5.0
+  requirements.txt         # ray[data,train,tune,serve]==2.56.1, sagemaker==3.16.0
 examples/<pattern>/<framework>/
   notebook.ipynb           # copies launcher.py in, then launches a ModelTrainer job
   scripts/                 # entry script + model + requirements.txt
@@ -295,5 +295,5 @@ All shelling-out is centralized and hardened:
 
 Full parameter and environment-variable tables live in README → "Required Parameters and
 Environment Variables" (kept there to avoid duplication/drift). Core dependency pins are in
-`scripts/requirements.txt` (`ray[data,train,tune,serve]==2.54.0`, `sagemaker==3.5.0`);
+`scripts/requirements.txt` (`ray[data,train,tune,serve]==2.56.1`, `sagemaker==3.16.0`);
 per-example extras live in each example's `scripts/requirements.txt`.

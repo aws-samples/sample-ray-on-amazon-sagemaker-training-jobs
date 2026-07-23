@@ -45,14 +45,23 @@ except ImportError:
         from transformers import AutoModelForVision2Seq as AutoModelForImageTextToText
     except ImportError:
         AutoModelForImageTextToText = None
-from trl import TrlParser
-import transformers
+from trl import SFTConfig, SFTTrainer, TrlParser
 from transformers.trainer_utils import get_last_checkpoint
 from transformers.integrations import WandbCallback
 import contextlib
 from typing import Any, Dict, List, Optional, Tuple
 import wandb
-from distutils.util import strtobool
+try:
+    from distutils.util import strtobool
+except ImportError:  # distutils was removed from the stdlib in Python 3.12
+    def strtobool(val):
+        """String truthy/falsey -> 1/0 (distutils.util.strtobool replacement)."""
+        val = str(val).strip().lower()
+        if val in ("y", "yes", "t", "true", "on", "1"):
+            return 1
+        if val in ("n", "no", "f", "false", "off", "0"):
+            return 0
+        raise ValueError(f"invalid truth value {val!r}")
 
 # Configure logging
 logging.basicConfig(
@@ -68,6 +77,28 @@ class ScriptArguments:
 
     apply_truncation: Optional[bool] = field(
         default=False, metadata={"help": "Whether to apply truncation"}
+    )
+    auto_calculate_lengths: bool = field(
+        default=False,
+        metadata={
+            "help": (
+                "Auto-calculate SFTConfig.max_length from the dataset's "
+                "95th-percentile token length (text/messages formats only, "
+                "SFTTrainer path). Ignored for image modality and pretokenized "
+                "datasets. NOTE: for backward compatibility, apply_truncation=True "
+                "with max_length left at the SFTConfig default also triggers this."
+            )
+        },
+    )
+    deserialize_messages: bool = field(
+        default=False,
+        metadata={
+            "help": (
+                "Lazily parse JSON-encoded 'messages' into native lists via "
+                "set_transform before handing the dataset to SFTTrainer (mirrors "
+                "the DPO script). Leave False when messages are already native lists."
+            )
+        },
     )
     attn_implementation: Optional[str] = field(
         default="flash_attention_2", metadata={"help": "Attention implementation"}
@@ -86,9 +117,6 @@ class ScriptArguments:
     lora_alpha: Optional[int] = field(default=16, metadata={"help": "lora_alpha"})
     lora_dropout: Optional[float] = field(
         default=0.1, metadata={"help": "lora_dropout"}
-    )
-    max_length: Optional[int] = field(
-        default=None, metadata={"help": "max_length used for truncation"}
     )
     merge_weights: Optional[bool] = field(
         default=False, metadata={"help": "Merge adapter with base model"}
@@ -166,7 +194,7 @@ class ScriptArguments:
         metadata={
             "help": (
                 "Patch PEFT's FSDP auto-wrap policy for architectures PEFT doesn't "
-                "recognize (e.g. Qwen3.5). FSDP + LoRA only."
+                "recognize. FSDP + LoRA only."
             )
         },
     )
@@ -175,7 +203,7 @@ class ScriptArguments:
         metadata={
             "help": (
                 "Cast all model parameters to uniform dtype. Required for models "
-                "with mixed float32/bfloat16 parameters (e.g. Qwen3.5 inv_freq). "
+                "with mixed float32/bfloat16 parameters. "
                 "Needed for both FSDP and DeepSpeed."
             )
         },
@@ -419,11 +447,18 @@ def load_model(config_builder: ModelConfigBuilder, script_args: ScriptArguments)
                 script_args.model_id, **model_kwargs
             )
 
-        # Apply gradient checkpointing configuration
+        # Apply gradient checkpointing configuration.
+        # User-provided gradient_checkpointing_kwargs in the YAML wins. If the user
+        # didn't pin use_reentrant, fall back to the strategy-appropriate default:
+        # FSDP/DDP -> non-reentrant, DeepSpeed ZeRO-3 -> reentrant (non-reentrant's
+        # saved_tensors_hooks see partitioned weights on backward and raise CheckpointError).
         if config_builder.training_args.gradient_checkpointing:
-            model.gradient_checkpointing_enable(
-                gradient_checkpointing_kwargs={"use_reentrant": False}
+            gc_kwargs = dict(
+                config_builder.training_args.gradient_checkpointing_kwargs or {}
             )
+            if "use_reentrant" not in gc_kwargs:
+                gc_kwargs["use_reentrant"] = bool(config_builder.use_deepspeed)
+            model.gradient_checkpointing_enable(gradient_checkpointing_kwargs=gc_kwargs)
 
         return model
     except Exception as e:
@@ -446,7 +481,12 @@ def load_tokenizer(script_args: ScriptArguments) -> AutoTokenizer:
 def load_processor(script_args: ScriptArguments):
     """Load processor for multimodal models. Returns None if unavailable."""
     try:
-        processor = AutoProcessor.from_pretrained(script_args.model_id)
+        processor = AutoProcessor.from_pretrained(
+            script_args.model_id, trust_remote_code=True
+        )
+        tokenizer = getattr(processor, "tokenizer", None)
+        if tokenizer is not None and tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
         logger.info(f"Loaded processor for {script_args.model_id}")
         return processor
     except Exception as e:
@@ -543,7 +583,7 @@ def patch_peft_fsdp_auto_wrap_policy():
     """Patch PEFT's fsdp_auto_wrap_policy for model architectures that PEFT doesn't recognize.
 
     PEFT's implementation inspects the model to find the transformer layer class but fails
-    on newer architectures (e.g. Qwen3.5). This patch catches the exception and auto-detects
+    on newer architectures. This patch catches the exception and auto-detects
     the decoder layer class by scanning for modules with 'DecoderLayer' in their class name.
 
     This is safe to call unconditionally — if PEFT's original function works, the patch
@@ -577,14 +617,30 @@ def patch_peft_fsdp_auto_wrap_policy():
             )
             from peft.tuners import PrefixEncoder, PromptEmbedding, PromptEncoder
 
-            peft_cls = (PrefixEncoder, PromptEmbedding, PromptEncoder)
+            peft_prompt_learning_cls = [PrefixEncoder, PromptEmbedding, PromptEncoder]
+            try:
+                from peft.tuners import CartridgeEncoder
+
+                peft_prompt_learning_cls.append(CartridgeEncoder)
+            except ImportError:
+                pass
+
+            def _leaf_with_trainable_weight(module):
+                # Matches PEFT's real lambda_policy_fn: wrap any leaf module that
+                # owns a trainable weight (e.g. LoRA's lora_A/lora_B) as its own
+                # FSDP unit, separate from the frozen decoder layer around it.
+                return (
+                    len(list(module.named_children())) == 0
+                    and getattr(module, "weight", None) is not None
+                    and module.weight.requires_grad
+                )
+
             lambda_policy = functools.partial(
-                lambda_auto_wrap_policy,
-                lambda_fn=lambda module: isinstance(module, peft_cls),
+                lambda_auto_wrap_policy, lambda_fn=_leaf_with_trainable_weight
             )
             transformer_policy = functools.partial(
                 transformer_auto_wrap_policy,
-                transformer_layer_cls={decoder_layer_cls},
+                transformer_layer_cls={decoder_layer_cls, *peft_prompt_learning_cls},
             )
             return functools.partial(
                 _or_policy, policies=[lambda_policy, transformer_policy]
@@ -594,24 +650,98 @@ def patch_peft_fsdp_auto_wrap_policy():
     logger.info("PEFT FSDP auto-wrap policy patch applied")
 
 
-def cast_parameters_to_uniform_dtype(model, target_dtype: torch.dtype) -> int:
-    """Cast all model parameters to a uniform dtype for FSDP compatibility.
+def cast_parameters_to_uniform_dtype(
+    model,
+    target_dtype: torch.dtype,
+    cast_buffers: bool = True,
+    exclude_buffer_pattern: Optional[str] = None,
+) -> int:
+    """Cast ordinary floating-point base-model params (and optionally buffers) to a
+    uniform dtype so FSDP1 can flatten them into a single FlatParameter.
 
-    Some model architectures (e.g. Qwen3.5) have parameters like inv_freq in
-    rotary embeddings that remain float32 even when loaded with torch_dtype=bfloat16.
-    FSDP requires all parameters to have the same dtype, and mixed dtypes also cause
-    gradient checkpointing recomputation mismatches (PyTorch issue #159359).
+    FSDP1 needs a uniform dtype only among parameters flattened into the same FSDP
+    unit. In HF/Accelerate that unit is a whole layer class, so an fp32 island inside
+    an otherwise-bf16 layer -- a module transformers keeps in fp32
+    (`_keep_in_fp32_modules`), or an fp32 rotary `inv_freq` buffer / Mamba-MoE router
+    param -- triggers `Must flatten tensors with uniform dtype ... float32 and
+    bfloat16`. Mixed dtypes also cause gradient-checkpointing recomputation
+    mismatches (PyTorch issue #159359), which is why floating-point buffers are cast
+    too (they are checked via named_buffers(), e.g. non-persistent rotary inv_freq).
 
-    Returns the number of parameters that were cast.
+    Call this BEFORE apply_lora_config(): PEFT's get_peft_model() upcasts LoRA adapter
+    weights to float32 (autocast_adapter_dtype=True, the default) for training
+    stability; casting afterwards would silently undo that and train LoRA in bf16.
+
+    Safety:
+      * Only floating-point tensors are cast; quantized/packed params (bitsandbytes
+        Params4bit/Int8Params, etc.) and meta/DTensor tensors are skipped so their
+        packed storage is never corrupted.
+      * When target_dtype != float32, modules transformers deliberately keeps in fp32
+        (`_keep_in_fp32_modules`) are downcast and warned about -- fine for a frozen
+        LoRA base, riskier for full fine-tuning (prefer FSDP2 / MixedPrecision there).
+      * Pass exclude_buffer_pattern=r"inv_freq|rotary" on long-context runs to keep
+        rotary frequencies in fp32 (RoPE phase error grows with position).
+      * Tied weights are re-tied after casting, since .to() allocates new tensors.
+
+    Returns the number of parameters/buffers that were cast.
     """
+    quantized_param_types = {
+        "Params4bit",
+        "Int8Params",
+        "Params8bit",
+        "FP8Parameter",
+    }
+    keep_fp32 = set(getattr(model, "_keep_in_fp32_modules", None) or [])
+    buf_exclude = None
+    if exclude_buffer_pattern:
+        import re
+
+        buf_exclude = re.compile(exclude_buffer_pattern)
+
     cast_count = 0
+    downcast_kept_fp32 = []
     for name, param in model.named_parameters():
-        if param.dtype != target_dtype:
-            param.data = param.data.to(target_dtype)
+        if (
+            type(param).__name__ in quantized_param_types
+            or not param.is_floating_point()
+            or param.is_meta
+            or type(param.data).__name__ == "DTensor"
+            or param.dtype == target_dtype
+        ):
+            continue
+        if (
+            keep_fp32
+            and target_dtype != torch.float32
+            and any(k in name for k in keep_fp32)
+        ):
+            downcast_kept_fp32.append(name)
+        param.data = param.data.to(target_dtype)
+        cast_count += 1
+
+    if cast_buffers:
+        for name, buf in model.named_buffers():
+            if (
+                not buf.is_floating_point()
+                or buf.is_meta
+                or buf.dtype == target_dtype
+                or (buf_exclude is not None and buf_exclude.search(name))
+            ):
+                continue
+            buf.data = buf.data.to(target_dtype)
             cast_count += 1
+
+    if cast_count > 0 and hasattr(model, "tie_weights"):
+        model.tie_weights()
+
+    if downcast_kept_fp32:
+        logger.warning(
+            f"Downcast {len(downcast_kept_fp32)} module(s) transformers keeps in fp32 "
+            f"({', '.join(sorted(set(downcast_kept_fp32))[:5])}) to {target_dtype}; "
+            "fine for a frozen LoRA base, riskier for full fine-tuning."
+        )
     if cast_count > 0:
         logger.info(
-            f"Cast {cast_count} parameters from mixed dtypes to {target_dtype} for FSDP"
+            f"Cast {cast_count} parameters/buffers from mixed dtypes to {target_dtype} for FSDP"
         )
     return cast_count
 
@@ -667,10 +797,14 @@ class MultiModalDataCollator:
         processor,
         script_args: ScriptArguments,
         vision_token_ids: Optional[List[int]] = None,
+        max_length: Optional[int] = None,
     ):
         self.processor = processor
         self.script_args = script_args
         self.vision_token_ids = set(vision_token_ids or [])
+        # max_length now comes from SFTConfig.max_length (ScriptArguments.max_length
+        # was removed to avoid a TrlParser arg collision with SFTConfig).
+        self.max_length = max_length
         self.tokenizer = (
             processor.tokenizer if hasattr(processor, "tokenizer") else processor
         )
@@ -705,7 +839,7 @@ class MultiModalDataCollator:
                 return_tensors="pt",
                 padding=True,
                 truncation=self.script_args.apply_truncation,
-                max_length=self.script_args.max_length,
+                max_length=self.max_length,
             )
         else:
             batch = self.processor(
@@ -713,7 +847,7 @@ class MultiModalDataCollator:
                 return_tensors="pt",
                 padding=True,
                 truncation=self.script_args.apply_truncation,
-                max_length=self.script_args.max_length,
+                max_length=self.max_length,
             )
 
         labels = batch["input_ids"].clone()
@@ -735,8 +869,21 @@ def setup_trainer(
     callbacks: Optional[List] = None,
     processor=None,
     script_args: Optional[ScriptArguments] = None,
-) -> Trainer:
-    """Set up the Trainer using centralized configuration."""
+):
+    """Set up the trainer.
+
+    Two engines share the same infra (LoRA / quantization / FSDP / DeepSpeed /
+    MLflow / save+merge):
+
+      - image modality  -> base ``transformers.Trainer`` + ``MultiModalDataCollator``.
+        Kept on purpose: TRL's built-in vision collator expects images as dataset
+        features and can't decode our base64 / ``file://`` inline images or mask
+        vision special tokens the way this collator does.
+      - text / messages / pretokenized -> ``trl.SFTTrainer``, which tokenizes,
+        applies the chat template (passing a ``tools`` column), appends EOS to
+        plain-text samples, supports packing, and can mask prompt tokens via
+        ``assistant_only_loss`` (set in the YAML/SFTConfig).
+    """
     trainer_kwargs = config_builder.build_trainer_kwargs()
 
     # Update training_args with trainer configs
@@ -751,11 +898,13 @@ def setup_trainer(
         report_to.append("mlflow")
     config_builder.training_args.report_to = report_to
 
-    if (
+    is_vlm = (
         script_args is not None
         and script_args.modality_type == "image"
         and processor is not None
-    ):
+    )
+
+    if is_vlm:
         vision_token_ids = get_vision_special_token_ids(processor)
         logger.info(
             f"Using multi-modal data collator (vision tokens to mask: {len(vision_token_ids)})"
@@ -764,19 +913,30 @@ def setup_trainer(
             processor=processor,
             script_args=script_args,
             vision_token_ids=vision_token_ids,
+            max_length=getattr(config_builder.training_args, "max_length", None),
         )
-    else:
-        data_collator = transformers.DataCollatorForLanguageModeling(
-            tokenizer, mlm=False
+        return Trainer(
+            model=model,
+            train_dataset=train_ds,
+            eval_dataset=test_ds if test_ds is not None else None,
+            args=config_builder.training_args,
+            callbacks=callbacks,
+            data_collator=data_collator,
         )
 
-    return Trainer(
+    # SFT path (text / messages / pretokenized): SFTTrainer owns tokenization,
+    # chat-template rendering, EOS, truncation to max_length, packing and optional
+    # assistant-only loss masking. The model is already PEFT-wrapped upstream, so
+    # no peft_config is passed (SFTTrainer detects the PeftModel and uses it as-is),
+    # matching how the DPO/GRPO scripts wire up their trainers.
+    logger.info("Using SFTTrainer for text/messages/pretokenized dataset")
+    return SFTTrainer(
         model=model,
+        args=config_builder.training_args,
         train_dataset=train_ds,
         eval_dataset=test_ds if test_ds is not None else None,
-        args=config_builder.training_args,
+        processing_class=tokenizer,
         callbacks=callbacks,
-        data_collator=data_collator,
     )
 
 
@@ -951,6 +1111,27 @@ def _load_and_merge_adapter(adapter_dir: str, torch_dtype: torch.dtype):
     return merged_causal
 
 
+def _coerce_tied_weights_keys(model):
+    """Compatibility shim for save_pretrained across transformers versions.
+
+    transformers >= 5.x expects each module's ``_tied_weights_keys`` to be a dict
+    (``_get_tied_weight_keys`` calls ``.keys()`` on it during ``save_pretrained``).
+    Some remote-code models (e.g. NVIDIA Nemotron-H, which sets
+    ``_tied_weights_keys = ["lm_head.weight"]``) still use the old list convention,
+    triggering ``AttributeError: 'list' object has no attribute 'keys'`` at save time.
+
+    Convert any list/tuple/set form to ``{key: key}`` in place. transformers only
+    consumes the keys (as regex patterns matched against pointer-shared tensors), so
+    the mapping value is irrelevant, and this is a no-op on versions/models that
+    already use a dict.
+    """
+    for module in model.modules():
+        tied = getattr(module, "_tied_weights_keys", None)
+        if isinstance(tied, (list, tuple, set)):
+            module._tied_weights_keys = {k: k for k in tied}
+    return model
+
+
 def _merge_adapter_in_process(
     temp_dir: str,
     final_output_dir: str,
@@ -959,6 +1140,7 @@ def _merge_adapter_in_process(
     """Merge LoRA adapter in the current process (for FSDP/DDP)."""
     with gpu_memory_manager():
         model = _load_and_merge_adapter(temp_dir, torch_dtype)
+        _coerce_tied_weights_keys(model)
         model.save_pretrained(
             final_output_dir, safe_serialization=True, max_shard_size="2GB"
         )
@@ -975,8 +1157,7 @@ def _merge_adapter_via_subprocess(
     Auto-detects whether the base model is a VLM from the adapter config and
     loads with the correct auto class to preserve vision encoder weights.
     """
-    merge_script = textwrap.dedent(
-        f"""\
+    merge_script = textwrap.dedent(f"""\
         import glob
         import os
         import torch
@@ -1076,6 +1257,12 @@ def _merge_adapter_via_subprocess(
                 model = vlm_model
 
         print("Saving merged model...")
+        # Compat: transformers >=5.x calls .keys() on each module's _tied_weights_keys;
+        # some remote-code models (e.g. Nemotron-H) declare it as a list. Coerce to a dict.
+        for _m in model.modules():
+            _tied = getattr(_m, "_tied_weights_keys", None)
+            if isinstance(_tied, (list, tuple, set)):
+                _m._tied_weights_keys = {{k: k for k in _tied}}
         model.save_pretrained(
             output_dir,
             safe_serialization=True,
@@ -1083,8 +1270,7 @@ def _merge_adapter_via_subprocess(
         )
 
         print("Merge complete!")
-    """
-    )
+    """)
 
     clean_env = {
         k: v
@@ -1217,7 +1403,15 @@ def save_model(
                         "Skipping MLflow registration (model merged in subprocess)"
                     )
         else:
-            trainer.model.save_pretrained(temp_dir, safe_serialization=False)
+            # FSDP/DDP: use trainer.save_model so Accelerate honors the
+            # FULL_STATE_DICT type set above and gathers a full, unsharded adapter
+            # of plain tensors (this call must run on all ranks for the gather's
+            # collective). Calling trainer.model.save_pretrained directly bypasses
+            # that gather and pickles sharded FSDP DTensors; reloading them makes
+            # merge_and_unload()'s weight_B @ weight_A a DTensor reshard (all-to-all)
+            # on CPU, which fails with "No backend type associated with device type
+            # cpu" because the process group only has the GPU-only NCCL backend.
+            trainer.save_model(temp_dir)
             accelerator.wait_for_everyone()
 
             if accelerator.is_main_process:
@@ -1405,64 +1599,41 @@ def calculate_optimal_max_length(
     return max_length
 
 
-def _tokenize_text_dataset(
-    tokenizer: AutoTokenizer,
-    dataset: Dataset,
-    script_args: ScriptArguments,
-    max_length: Optional[int],
+def _normalize_messages_for_sft(
+    dataset: Dataset, script_args: ScriptArguments
 ) -> Dataset:
-    """Tokenize a text-column dataset."""
-    return dataset.map(
-        lambda sample: tokenizer(
-            sample[script_args.text_field],
-            padding=False,
-            truncation=script_args.apply_truncation,
-            max_length=max_length if script_args.apply_truncation else None,
-        ),
-        remove_columns=list(dataset.features),
-        batched=True,
-        batch_size=1000,
-    )
+    """Shape a conversational dataset the way SFTTrainer expects it.
 
-
-def _tokenize_messages_dataset(
-    tokenizer: AutoTokenizer,
-    dataset: Dataset,
-    script_args: ScriptArguments,
-    max_length: Optional[int],
-    processor=None,
-) -> Dataset:
-    """Tokenize a conversational messages dataset using apply_chat_template.
-
-    Uses the processor's apply_chat_template when available (multimodal models),
-    falling back to the tokenizer's for text-only models.
+    SFTTrainer reads a column literally named ``messages`` holding native lists of
+    message dicts (it then applies the chat template, passing any ``tools`` column,
+    and tokenizes). We therefore:
+      1. rename a custom messages field to ``messages`` (cheap metadata rename, no
+         re-serialization -> avoids Arrow schema conflicts with varying tool_calls);
+      2. optionally parse JSON-encoded messages lazily via ``set_transform`` when
+         ``deserialize_messages=True`` (mirrors the DPO script).
+    The ``tools`` column is left untouched: SFTTrainer runs ``json.loads`` on it
+    when it's a string and passes it to apply_chat_template itself.
     """
-    has_tools = "tools" in dataset.column_names
-    apply_chat_template = _get_chat_template_callable(tokenizer, processor)
+    if script_args.messages_field != "messages":
+        dataset = dataset.rename_column(script_args.messages_field, "messages")
 
-    def tokenize_conversation(sample):
-        messages = sample[script_args.messages_field]
-        if isinstance(messages, str):
-            messages = json.loads(messages)
+    if script_args.deserialize_messages:
 
-        kwargs = {}
-        if has_tools and sample["tools"]:
-            tools = sample["tools"]
-            if isinstance(tools, str):
-                tools = json.loads(tools)
-            kwargs["tools"] = tools
+        def _transform(batch):
+            parsed = []
+            for msgs in batch["messages"]:
+                if isinstance(msgs, str):
+                    try:
+                        msgs = json.loads(msgs)
+                    except (json.JSONDecodeError, ValueError):
+                        pass  # keep as-is (standard/plain format)
+                parsed.append(msgs)
+            batch["messages"] = parsed
+            return batch
 
-        token_ids = apply_chat_template(messages, tokenize=True, **kwargs)
+        dataset.set_transform(_transform)
 
-        if script_args.apply_truncation and max_length is not None:
-            token_ids = token_ids[:max_length]
-
-        return {"input_ids": token_ids, "attention_mask": [1] * len(token_ids)}
-
-    return dataset.map(
-        tokenize_conversation,
-        remove_columns=list(dataset.features),
-    )
+    return dataset
 
 
 def prepare_dataset(
@@ -1471,29 +1642,27 @@ def prepare_dataset(
     train_ds: Dataset,
     test_ds: Optional[Dataset] = None,
     processor=None,
+    dataset_format: Optional[str] = None,
 ):
-    """Prepare the dataset for training with optimal tokenization.
+    """Prepare datasets per modality (tokenization is delegated downstream).
 
-    Supports three dataset formats (auto-detected or explicitly set via --dataset_format):
-      - 'pretokenized': Dataset already has 'input_ids' column, skip tokenization.
-      - 'text': Dataset has a text column (default 'text'), tokenize directly.
-      - 'messages': Dataset has a messages column (default 'messages') with
-        conversational format (list of message dicts). Uses apply_chat_template
-        to render and tokenize. For multimodal models, the processor's
-        apply_chat_template is used when available. Optionally supports a
-        'tools' column (JSON string).
+    Supported formats (auto-detected or via --dataset_format):
+      - 'pretokenized': already has 'input_ids' -> passed straight through
+        (SFTTrainer skips its own tokenization when 'input_ids' is present).
+      - 'text': pre-rendered text column (default 'text') -> SFTTrainer tokenizes
+        it and appends EOS. Optional char-level outlier filtering when apply_truncation.
+      - 'messages': conversational lists -> normalized (field renamed to 'messages',
+        optional lazy JSON parse) so SFTTrainer can apply the chat template + tools.
+
+    Image modality leaves raw columns intact so MultiModalDataCollator can read
+    messages/images at collation time.
     """
-    dataset_format = detect_dataset_format(train_ds, script_args)
+    if dataset_format is None:
+        dataset_format = detect_dataset_format(train_ds, script_args)
 
-    if dataset_format == "pretokenized":
-        logger.info(
-            "Dataset already contains 'input_ids' - skipping tokenization "
-            f"(columns: {train_ds.column_names})"
-        )
-        return train_ds, test_ds
-
+    # Character-level outlier filtering (text format only) - preserved from the
+    # original logic; applies to both the image and SFT text paths.
     if script_args.apply_truncation and dataset_format == "text":
-        # Character-level outlier filtering only for text format
         logger.info(f"Original training samples: {len(train_ds)}")
         lengths = [len(x[script_args.text_field]) for x in train_ds]
         threshold = sorted(lengths)[int(0.995 * len(lengths))]
@@ -1502,7 +1671,6 @@ def prepare_dataset(
             lambda x: len(x[script_args.text_field]) <= threshold
         )
         logger.info(f"Filtered training samples: {len(train_ds)}")
-
         if test_ds is not None:
             logger.info(f"Original test samples: {len(test_ds)}")
             test_ds = test_ds.filter(
@@ -1510,49 +1678,235 @@ def prepare_dataset(
             )
             logger.info(f"Filtered test samples: {len(test_ds)}")
 
-    if script_args.apply_truncation:
-        if script_args.max_length is None:
-            script_args.max_length = calculate_optimal_max_length(
-                tokenizer, train_ds, script_args, dataset_format, processor
-            )
-    max_length = script_args.max_length
-
-    logger.info(f"Using max_length: {max_length}")
-    logger.info(f"Truncation enabled: {script_args.apply_truncation}")
-    logger.info(f"Dataset format: {dataset_format}")
-
+    # Image modality: hand raw columns to the collator, no pre-tokenization here.
     if script_args.modality_type == "image":
         logger.info(
-            "Image modality: skipping pre-tokenization (processing happens in data collator)"
+            "Image modality: skipping pre-tokenization (handled by "
+            f"MultiModalDataCollator). Truncation={script_args.apply_truncation}"
+        )
+        return train_ds, test_ds
+
+    # SFT (text / messages / pretokenized): SFTTrainer does the tokenization.
+    logger.info(f"Dataset format: {dataset_format} (tokenized by SFTTrainer)")
+
+    if dataset_format == "pretokenized":
+        logger.info(
+            "Dataset already contains 'input_ids' - SFTTrainer will use it as-is "
+            f"(columns: {train_ds.column_names})"
         )
         return train_ds, test_ds
 
     if dataset_format == "messages":
-        lm_train_dataset = _tokenize_messages_dataset(
-            tokenizer, train_ds, script_args, max_length, processor
-        )
-        lm_test_dataset = (
-            _tokenize_messages_dataset(
-                tokenizer, test_ds, script_args, max_length, processor
-            )
-            if test_ds is not None
-            else None
-        )
+        train_ds = _normalize_messages_for_sft(train_ds, script_args)
+        if test_ds is not None:
+            test_ds = _normalize_messages_for_sft(test_ds, script_args)
+
+    # 'text' format: no reshaping needed; SFTTrainer reads dataset_text_field.
+    return train_ds, test_ds
+
+
+def train_func(config):
+    """Ray Train worker function.
+
+    Runs once per Ray Train worker. ``config`` carries the ``script_args`` and
+    ``training_args`` (an ``SFTConfig``) constructed in ``main()`` on the driver.
+
+    Args:
+        config: dict with "script_args" and "training_args".
+    """
+    import dataclasses
+
+    script_args = config["script_args"]
+
+    # Re-create SFTConfig to pick up the worker's distributed state.
+    # Ray pickles the object from main() without calling __post_init__ on restore,
+    # so the internal PartialState still reflects the non-distributed driver process.
+    # This re-creation triggers __post_init__ which detects torch.distributed
+    # (initialized by Ray) and enables FSDP/DeepSpeed.
+    training_args = SFTConfig(
+        **{
+            f.name: getattr(config["training_args"], f.name)
+            for f in dataclasses.fields(config["training_args"])
+            if f.init
+        }
+    )
+
+    set_seed(training_args.seed)
+
+    # Create centralized config builder
+    config_builder = ModelConfigBuilder(script_args, training_args)
+    mlflow_enabled = is_mlflow_enabled(script_args)
+
+    if script_args.token is not None:
+        os.environ.update({"HF_TOKEN": script_args.token})
+        if dist.is_initialized():
+            logger.info("Waiting for all processes after setting HF token")
+            dist.barrier()
+
+    if script_args.use_snapshot_download:
+        download_model(script_args.model_id)
+        if dist.is_initialized():
+            logger.info("Waiting for all processes after model download")
+            dist.barrier()
+        script_args.model_id = "/tmp/tmp_folder"
+
+    # Load model, tokenizer, and processor using centralized config
+    model = load_model(config_builder, script_args)
+    tokenizer = load_tokenizer(script_args)
+    processor = load_processor(script_args)
+    is_vlm = script_args.modality_type == "image"
+
+    # Load datasets inside the worker (each Ray worker reads from the shared
+    # SageMaker input channels on local disk / FSx).
+    train_ds, test_ds = load_datasets(script_args)
+
+    # Detect the format up front (on ORIGINAL column names) so we can auto-calc the
+    # length and set dataset_text_field before the messages column gets renamed.
+    dataset_format = detect_dataset_format(train_ds, script_args)
+
+    if is_vlm:
+        # Image modality skips pre-tokenization (prepare_dataset leaves raw columns
+        # like `messages_field` / images intact; MultiModalDataCollator reads them at
+        # collation time). Trainer's default remove_unused_columns=True strips any
+        # dataset column not in the model's forward() signature (e.g. "messages"),
+        # which would starve the collator before it ever runs. Force it off here so
+        # this can't be forgotten in args.yaml.
+        training_args.remove_unused_columns = False
     else:
-        lm_train_dataset = _tokenize_text_dataset(
-            tokenizer, train_ds, script_args, max_length
+        # SFT (text/messages) path. Preserve the original percentile-based length
+        # logic, but feed the result into SFTConfig.max_length (SFTTrainer truncates
+        # to it) instead of tokenizing ourselves. Trigger it when explicitly requested
+        # OR (legacy behavior) when apply_truncation is on and max_length was left at
+        # the SFTConfig default. Skipped for pretokenized data.
+        default_max_length = 1024  # SFTConfig.max_length default
+        max_length_is_default = getattr(training_args, "max_length", None) in (
+            None,
+            default_max_length,
         )
-        lm_test_dataset = (
-            _tokenize_text_dataset(tokenizer, test_ds, script_args, max_length)
-            if test_ds is not None
-            else None
+        want_autocalc = script_args.auto_calculate_lengths or (
+            script_args.apply_truncation and max_length_is_default
+        )
+        if dataset_format != "pretokenized" and want_autocalc:
+            computed = calculate_optimal_max_length(
+                tokenizer, train_ds, script_args, dataset_format, processor=None
+            )
+            training_args.max_length = computed
+            logger.info(f"Set SFTConfig.max_length={computed} (auto-calculated)")
+
+        # Point SFTTrainer at the configured text column for the 'text' format.
+        if dataset_format == "text":
+            training_args.dataset_text_field = script_args.text_field
+
+    train_ds, test_ds = prepare_dataset(
+        tokenizer, script_args, train_ds, test_ds, processor, dataset_format
+    )
+
+    # Cast the frozen base model's params/buffers to a uniform dtype BEFORE LoRA is
+    # applied, so PEFT's fp32 upcast of the adapter weights (see apply_lora_config /
+    # get_peft_model) is preserved instead of being immediately overwritten.
+    if script_args.cast_parameters_to_uniform_dtype:
+        cast_parameters_to_uniform_dtype(model, config_builder.torch_dtype)
+
+    if script_args.use_peft:
+        model = apply_lora_config(model, script_args, is_vlm=is_vlm)
+
+    if (
+        script_args.patch_peft_fsdp_auto_wrap_policy
+        and script_args.use_peft
+        and training_args.fsdp
+        and training_args.fsdp != ""
+    ):
+        patch_peft_fsdp_auto_wrap_policy()
+
+    callbacks = setup_wandb(script_args)
+    if script_args.early_stopping:
+        if callbacks is None:
+            callbacks = []
+        callbacks.append(
+            EarlyStoppingCallback(
+                early_stopping_patience=3, early_stopping_threshold=0.01
+            )
         )
 
-    logger.info(f"Total number of train samples: {len(lm_train_dataset)}")
-    if lm_test_dataset is not None:
-        logger.info(f"Total number of test samples: {len(lm_test_dataset)}")
+        training_args.load_best_model_at_end = True
+        training_args.metric_for_best_model = "eval_loss"
+        training_args.greater_is_better = False
+    trainer = setup_trainer(
+        model,
+        tokenizer,
+        train_ds,
+        config_builder,
+        test_ds,
+        callbacks,
+        processor=processor,
+        script_args=script_args,
+    )
 
-    return lm_train_dataset, lm_test_dataset
+    # Prepare the HF Trainer for Ray distributed training (wires up the Ray
+    # reporting/checkpoint callbacks and the worker's distributed context).
+    trainer = ray.train.huggingface.transformers.prepare_trainer(trainer)
+
+    if trainer.accelerator.is_main_process:
+        trainer.model.print_trainable_parameters()
+
+    if script_args.checkpoint_dir is not None:
+        os.makedirs(script_args.checkpoint_dir, exist_ok=True)
+
+        original_output_dir = training_args.output_dir
+        training_args.output_dir = script_args.checkpoint_dir
+    else:
+        original_output_dir = training_args.output_dir
+
+    # Start training
+    if mlflow_enabled:
+        logger.info(f"MLflow tracking under {script_args.mlflow_experiment_name}")
+        mlflow.set_system_metrics_node_id(
+            f"node_{trainer.accelerator.process_index // torch.cuda.device_count()}"
+        )
+        if trainer.accelerator.is_main_process:
+            mlflow.start_run(run_name=os.environ.get("MLFLOW_RUN_NAME", None))
+            mlflow.log_params(
+                {
+                    "total_gpus": trainer.accelerator.num_processes,
+                    "nodes": trainer.accelerator.num_processes
+                    // torch.cuda.device_count(),
+                    "gpus_per_node": torch.cuda.device_count(),
+                }
+            )
+            try:
+                train_dataset_mlflow = mlflow.data.from_pandas(
+                    train_ds.to_pandas(), name="train_dataset"
+                )
+                mlflow.log_input(train_dataset_mlflow, context="train")
+            except Exception as e:
+                logger.warning(f"Failed to log dataset to MLflow: {e}")
+
+    if (
+        script_args.checkpoint_dir
+        and get_last_checkpoint(script_args.checkpoint_dir) is not None
+        and script_args.use_checkpoints
+    ):
+        train_result = trainer.train(resume_from_checkpoint=True)
+    else:
+        train_result = trainer.train()
+
+    metrics = train_result.metrics
+    metrics["train_samples"] = len(train_ds)
+    trainer.log_metrics("train", metrics)
+    trainer.save_metrics("train", metrics)
+    trainer.save_state()
+
+    save_model(
+        trainer,
+        model,
+        tokenizer,
+        processor,
+        script_args,
+        trainer.accelerator,
+        mlflow_enabled,
+        original_output_dir,
+    )
+    trainer.accelerator.wait_for_everyone()
 
 
 def _is_hf_dataset_dir(path: str) -> bool:
@@ -1618,174 +1972,8 @@ def load_datasets(script_args: ScriptArguments) -> Tuple[Dataset, Optional[Datas
         raise
 
 
-def train_func(config):
-    """
-    Ray Train worker function.
-
-    Args:
-        config: dictionary containing script_args and training_args
-    """
-    import dataclasses
-
-    script_args = config["script_args"]
-
-    # Re-create TrainingArguments to pick up the worker's distributed state.
-    # Ray pickles the object from main() without calling __post_init__ on restore,
-    # so the internal PartialState still reflects the non-distributed main process.
-    # This re-creation triggers __post_init__ which detects torch.distributed
-    # (initialized by Ray) and enables FSDP/DeepSpeed.
-    training_args = TrainingArguments(
-        **{
-            f.name: getattr(config["training_args"], f.name)
-            for f in dataclasses.fields(config["training_args"])
-            if f.init
-        }
-    )
-
-    # Set random seed for reproducibility
-    set_seed(training_args.seed)
-
-    # Create centralized config builder
-    config_builder = ModelConfigBuilder(script_args, training_args)
-    mlflow_enabled = is_mlflow_enabled(script_args)
-
-    if script_args.token is not None:
-        os.environ.update({"HF_TOKEN": script_args.token})
-        if dist.is_initialized():
-            logger.info("Waiting for all processes after setting HF token")
-            dist.barrier()
-
-    if script_args.use_snapshot_download:
-        download_model(script_args.model_id)
-        if dist.is_initialized():
-            logger.info("Waiting for all processes after model download")
-            dist.barrier()
-        script_args.model_id = "/tmp/tmp_folder"
-
-    # Load model, tokenizer, and processor using centralized config
-    model = load_model(config_builder, script_args)
-    tokenizer = load_tokenizer(script_args)
-    processor = load_processor(script_args)
-    is_vlm = script_args.modality_type == "image"
-
-    # Load and prepare datasets
-    train_ds, test_ds = load_datasets(script_args)
-    train_ds, test_ds = prepare_dataset(
-        tokenizer, script_args, train_ds, test_ds, processor
-    )
-
-    if script_args.use_peft:
-        model = apply_lora_config(model, script_args, is_vlm=is_vlm)
-
-    if (
-        script_args.patch_peft_fsdp_auto_wrap_policy
-        and script_args.use_peft
-        and training_args.fsdp
-        and training_args.fsdp != ""
-    ):
-        patch_peft_fsdp_auto_wrap_policy()
-
-    if script_args.cast_parameters_to_uniform_dtype:
-        cast_parameters_to_uniform_dtype(model, config_builder.torch_dtype)
-
-    # Set up Weights & Biases
-    callbacks = setup_wandb(script_args)
-    if script_args.early_stopping:
-        if callbacks is None:
-            callbacks = []
-        callbacks.append(
-            EarlyStoppingCallback(
-                early_stopping_patience=3, early_stopping_threshold=0.01
-            )
-        )
-        training_args.load_best_model_at_end = True
-        training_args.metric_for_best_model = "eval_loss"
-        training_args.greater_is_better = False
-
-    # Set up trainer
-    trainer = setup_trainer(
-        model,
-        tokenizer,
-        train_ds,
-        config_builder,
-        test_ds,
-        callbacks,
-        processor=processor,
-        script_args=script_args,
-    )
-
-    # Prepare trainer for Ray distributed training
-    trainer = ray.train.huggingface.transformers.prepare_trainer(trainer)
-
-    # Print trainable parameters
-    if trainer.accelerator.is_main_process:
-        trainer.model.print_trainable_parameters()
-
-    # Create checkpoint directory if needed
-    if script_args.checkpoint_dir is not None:
-        os.makedirs(script_args.checkpoint_dir, exist_ok=True)
-        original_output_dir = training_args.output_dir
-        training_args.output_dir = script_args.checkpoint_dir
-    else:
-        original_output_dir = training_args.output_dir
-
-    # Start training
-    if mlflow_enabled:
-        logger.info(f"MLflow tracking under {script_args.mlflow_experiment_name}")
-        mlflow.set_system_metrics_node_id(
-            f"node_{trainer.accelerator.process_index // torch.cuda.device_count()}"
-        )
-        if trainer.accelerator.is_main_process:
-            mlflow.start_run(run_name=os.environ.get("MLFLOW_RUN_NAME", None))
-            mlflow.log_params(
-                {
-                    "total_gpus": trainer.accelerator.num_processes,
-                    "nodes": trainer.accelerator.num_processes
-                    // torch.cuda.device_count(),
-                    "gpus_per_node": torch.cuda.device_count(),
-                }
-            )
-            try:
-                train_dataset_mlflow = mlflow.data.from_pandas(
-                    train_ds.to_pandas(), name="train_dataset"
-                )
-                mlflow.log_input(train_dataset_mlflow, context="train")
-            except Exception as e:
-                logger.warning(f"Failed to log dataset to MLflow: {e}")
-
-    if (
-        script_args.checkpoint_dir is not None
-        and get_last_checkpoint(script_args.checkpoint_dir) is not None
-        and script_args.use_checkpoints
-    ):
-        train_result = trainer.train(resume_from_checkpoint=True)
-    else:
-        train_result = trainer.train()
-
-    metrics = train_result.metrics
-    metrics["train_samples"] = len(train_ds)
-    trainer.log_metrics("train", metrics)
-    trainer.save_metrics("train", metrics)
-    trainer.save_state()
-
-    # Save and register model
-    save_model(
-        trainer,
-        model,
-        tokenizer,
-        processor,
-        script_args,
-        trainer.accelerator,
-        mlflow_enabled,
-        original_output_dir,
-    )
-
-    # Wait for all processes to finish
-    trainer.accelerator.wait_for_everyone()
-
-
 def setup_workers(env):
-    """Configure worker settings based on available resources."""
+    """Configure worker settings based on available Ray cluster resources."""
     num_gpus = int(ray.available_resources().get("GPU", 0))
     num_cpus = int(ray.available_resources().get("CPU", env.num_cpus))
     logger.info(f"Found {num_gpus} GPUs, {num_cpus} CPUs")
@@ -1810,9 +1998,10 @@ def setup_workers(env):
 
 
 def main():
-    """Main function to parse arguments and start training."""
-    # Parse arguments
-    parser = TrlParser((ScriptArguments, TrainingArguments))
+    """Main function to parse arguments and start Ray distributed training."""
+    # Parse arguments. return_remaining_strings=True tolerates launcher-injected
+    # extra args (e.g. Ray/Prometheus flags) that aren't part of the training config.
+    parser = TrlParser((ScriptArguments, SFTConfig))
     script_args, training_args, _ = parser.parse_args_and_config(
         return_remaining_strings=True,
     )
@@ -1822,10 +2011,10 @@ def main():
     num_workers, num_gpus = setup_workers(env)
     set_custom_env({"HF_HUB_ENABLE_HF_TRANSFER": "1"})
 
-    # Setup MLflow and prepare model
+    # Setup MLflow on the driver (run name / experiment env vars propagate to workers)
     setup_mlflow(script_args)
 
-    # Configure and start training
+    # Configure and start Ray Train
     scaling_config = ray.train.ScalingConfig(
         num_workers=num_workers, use_gpu=num_gpus > 0
     )

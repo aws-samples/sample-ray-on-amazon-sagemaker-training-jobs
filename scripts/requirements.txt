@@ -1,2 +1,2 @@
-ray[data,train,tune,serve]==2.54.0
-sagemaker==3.5.0
+ray[data,train,tune,serve]==2.56.1
+sagemaker==3.16.0
