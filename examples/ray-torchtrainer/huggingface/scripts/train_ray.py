@@ -19,6 +19,7 @@ from peft import (
 from PIL import Image
 import ray
 from ray.train import RunConfig
+from ray.train.torch import TorchConfig
 import ray.train.torch
 import ray.train.huggingface.transformers
 import sagemaker_training.environment
@@ -2074,11 +2075,14 @@ def main():
         name=env.job_name,
     )
 
+    torch_config = TorchConfig(backend="cpu:gloo,cuda:nccl" if num_gpus > 0 else "gloo")
+
     trainer = ray.train.torch.TorchTrainer(
         train_func,
         train_loop_config={"config_path": config_path},
         scaling_config=scaling_config,
         run_config=run_config,
+        torch_config=torch_config,
     )
 
     trainer.fit()
