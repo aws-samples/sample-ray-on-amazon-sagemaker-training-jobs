@@ -105,6 +105,10 @@ prometheus_folder_name = None
 grafana_folder_name = None
 # Global variable to track the embedded Grafana process
 grafana_process = None
+# Arguments the launcher does not recognize. They are forwarded to Bash entry
+# scripts as positional arguments ("$@"). Python entry scripts run in-process and
+# can still read them from sys.argv (e.g. with parse_known_args).
+entry_script_args: List[str] = []
 
 
 def signal_handler(signum: int, frame: Any) -> None:
@@ -336,7 +340,7 @@ def _parse_args():
     logger.info(f"Arguments: {args}")
 
     if unknown:
-        logger.info(f"Ignoring unknown arguments: {unknown}")
+        logger.info(f"Arguments not used by the launcher: {unknown}")
 
     # Handle wait_shutdown parameter from environment variable if not provided as argument
     if args.wait_shutdown is None:
@@ -1836,34 +1840,29 @@ def _execute_bash_script(
     logger.info("Current working directory after change: %s", os.getcwd())
     logger.info("Contents of current directory: %s", os.listdir("."))
 
-    # Execute the bash script
-    logger.info("Executing bash script: %s", script_path)
+    # Execute the bash script, forwarding the arguments the launcher did not consume
+    command = ["bash", script_path, *entry_script_args]
+    logger.info("Executing bash script: %s", shlex.join(command))
 
-    # Use subprocess to run the bash script
+    # Do not capture the output: let the script write straight to the job's
+    # stdout/stderr so its logs reach CloudWatch while it runs, instead of only
+    # after it exits (long training scripts would otherwise show nothing for hours).
+    sys.stdout.flush()
+    sys.stderr.flush()
     try:
         result = subprocess.run(
-            ["bash", script_path],
+            command,
             check=True,
-            capture_output=True,
-            text=True,
             env=runtime_env,
             cwd=absolute_source_dir,
         )
-
-        # Log the output
-        if result.stdout:
-            logger.info("Script stdout:\n%s", result.stdout)
-        if result.stderr:
-            logger.info("Script stderr:\n%s", result.stderr)
-
         logger.info("Bash script completed with return code: %s", result.returncode)
 
     except subprocess.CalledProcessError as e:
-        logger.error("Bash script failed with return code: %s", e.returncode)
-        if e.stdout:
-            logger.error("Script stdout:\n%s", e.stdout)
-        if e.stderr:
-            logger.error("Script stderr:\n%s", e.stderr)
+        logger.error(
+            "Bash script failed with return code: %s (see the script output above)",
+            e.returncode,
+        )
         raise
 
 
@@ -2967,13 +2966,14 @@ def main() -> int:
     Returns:
         Exit code (0 for success, non-zero for failure)
     """
-    global has_failure, prometheus_folder_name, grafana_folder_name
+    global has_failure, prometheus_folder_name, grafana_folder_name, entry_script_args
     try:
-        # Parse only the arguments we care about and ignore the rest
+        # Parse only the arguments we care about; the rest go to the entry script
         args, unknown = _parse_args()
+        entry_script_args = list(unknown)
 
         if unknown:
-            logger.info("Ignoring unknown arguments: %s", unknown)
+            logger.info("Arguments passed through to the entry script: %s", unknown)
 
         # Get SageMaker environment information
         env = sagemaker_training.environment.Environment()

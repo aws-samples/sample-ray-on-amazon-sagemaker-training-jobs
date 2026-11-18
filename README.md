@@ -224,7 +224,9 @@ if __name__ == "__main__":
     pass
 ```
 
-Bash entry scripts are executed directly via `bash <script_path>`.
+Bash entry scripts are executed directly via `bash <script_path> [args...]`. Any arguments the launcher does not recognize are passed through to the script as positional arguments (`"$@"`), and the script's output is streamed to the job logs while it runs. For example, `python launcher.py -e run.sh --epochs 10` runs `bash run.sh --epochs 10`.
+
+Python entry scripts run inside the launcher process, so they can read the same arguments from `sys.argv` (for example with `argparse`'s `parse_known_args()`).
 
 ## Examples
 
